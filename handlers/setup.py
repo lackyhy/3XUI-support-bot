@@ -192,29 +192,33 @@ async def process_password(message: Message, state: FSMContext):
 # RENAME ACTIVE SERVER
 @router.callback_query(F.data == "rename_panel")
 async def cb_rename_panel_start(callback: CallbackQuery, state: FSMContext):
+    lang = bot_settings.get_language()
     active_panel = crypto_storage.get_active_panel()
     if not active_panel:
-        await callback.answer("Ошибка: Сервер не найден", show_alert=True)
+        await callback.answer("Error: Server not found" if lang == "en" else "Ошибка: Сервер не найден", show_alert=True)
         return
 
-    current_name = active_panel.get("name", "Сервер")
+    current_name = active_panel.get("name", "Server")
     await state.update_data(panel_id=active_panel.get("id"))
     await state.set_state(RenamePanelStates.waiting_for_new_name)
 
+    msg_txt = (
+        f"✏️ **Rename Active Server**\n\nCurrent name: `{current_name}`\n\nEnter a new custom name for this server (e.g. `Germany 1`, `Main VPN`):" if lang == "en" else f"✏️ **Изменение названия сервера**\n\nТекущее имя: `{current_name}`\n\nВведите новое пользовательское имя для этого сервера (например: `Финляндия 1`, `Основной VPN`):"
+    )
+
     await callback.message.edit_text(
-        f"✏️ **Изменение названия сервера**\n\n"
-        f"Текущее имя: `{current_name}`\n\n"
-        "Введите новое пользовательское имя для этого сервера (например: `Финляндия 1`, `Основной VPN`):",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
 
 @router.message(RenamePanelStates.waiting_for_new_name)
 async def process_rename_panel(message: Message, state: FSMContext):
+    lang = bot_settings.get_language()
     new_name = message.text.strip()
     if not new_name:
-        await message.answer("❌ Имя сервера не может быть пустым. Введите новое имя:", reply_markup=keyboards.cancel_kb())
+        await message.answer("❌ Server name cannot be empty. Enter a new name:" if lang == "en" else "❌ Имя сервера не может быть пустым. Введите новое имя:", reply_markup=keyboards.cancel_kb(lang=lang))
         return
 
     data = await state.get_data()
@@ -223,13 +227,13 @@ async def process_rename_panel(message: Message, state: FSMContext):
 
     if crypto_storage.rename_panel(panel_id, new_name):
         await message.answer(
-            f"✅ **Сервер успешно переименован в `{new_name}`!**",
+            f"✅ **Server renamed to `{new_name}`!**" if lang == "en" else f"✅ **Сервер успешно переименован в `{new_name}`!**",
             reply_markup=get_main_menu_markup(),
             parse_mode="Markdown"
         )
     else:
         await message.answer(
-            "❌ Ошибка при переименовании сервера.",
+            "❌ Error renaming server." if lang == "en" else "❌ Ошибка при переименовании сервера.",
             reply_markup=get_main_menu_markup()
         )
 
