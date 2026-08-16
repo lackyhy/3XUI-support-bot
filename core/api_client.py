@@ -26,6 +26,55 @@ def ensure_dict(val: Any) -> Dict[str, Any]:
             pass
     return {}
 
+def extract_external_sub(client_data: Dict[str, Any]) -> Optional[str]:
+    """Extracts external subscription URL from client dictionary or API response across all 3x-ui schema variations."""
+    if not client_data or not isinstance(client_data, dict):
+        return None
+
+    obj = client_data.get("obj") if isinstance(client_data.get("obj"), dict) else client_data
+
+    # 1. Check externalLinks array (Modern Sanaei 3x-ui v2.4+ schema!)
+    ext_links = obj.get("externalLinks")
+    if isinstance(ext_links, list) and ext_links:
+        for link_obj in ext_links:
+            if isinstance(link_obj, dict):
+                val = link_obj.get("value") or link_obj.get("url") or link_obj.get("link")
+                if val and isinstance(val, str) and val.startswith("http"):
+                    return val.strip()
+
+    # 2. Check inner client dict
+    client = obj.get("client") if isinstance(obj.get("client"), dict) else obj
+
+    for key in ['subLink', 'subUrl', 'externalSub', 'external_sub', 'externalSubscription', 'sub_url', 'sub_link']:
+        val = client.get(key)
+        if val and isinstance(val, str) and val.startswith('http'):
+            return val.strip()
+
+    comment = client.get('comment')
+    if comment and isinstance(comment, str) and comment.startswith('http'):
+        return comment.strip()
+
+    reverse = client.get('reverse')
+    if reverse:
+        if isinstance(reverse, str):
+            try:
+                reverse = json.loads(reverse)
+            except Exception:
+                pass
+        if isinstance(reverse, dict):
+            for key in ['subLink', 'subUrl', 'externalSub', 'external_sub', 'url', 'link']:
+                val = reverse.get(key)
+                if val and isinstance(val, str) and val.startswith('http'):
+                    return val.strip()
+            ext_list = reverse.get('external_subscriptions') or reverse.get('externalSubscriptions') or reverse.get('subs')
+            if isinstance(ext_list, list) and ext_list:
+                first = ext_list[0]
+                if isinstance(first, str) and first.startswith('http'):
+                    return first.strip()
+                elif isinstance(first, dict) and first.get('url'):
+                    return str(first.get('url')).strip()
+    return None
+
 class ThreeXUIClient:
     def __init__(
         self,
@@ -260,6 +309,14 @@ class ThreeXUIClient:
         }
         return await self._request("POST", "/panel/api/inbounds/addClient", json=legacy_payload)
 
+    async def get_client(self, email: str) -> Dict[str, Any]:
+        """
+        Gets full client details including externalLinks via modern /panel/api/clients/get/{email} endpoint.
+        """
+        import urllib.parse
+        quoted_email = urllib.parse.quote(email)
+        return await self._request("GET", f"/panel/api/clients/get/{quoted_email}")
+
     async def update_client(
         self,
         inbound_id: int,
@@ -433,3 +490,22 @@ class ThreeXUIClient:
             return f"trojan://{uuid}@{server_ip}:{port}?{query}#{urllib.parse.quote(title)}"
 
         return f"Неподдерживаемый протокол {protocol}"
+
+    def generate_subscription_link(self, client: Dict[str, Any], host_domain: str, sub_port: Optional[int] = None) -> str:
+        """
+        Generates 3x-ui Subscription URL for a client.
+        Format: http(s)://domain:sub_port/sub/{subId}
+        """
+        parsed_url = urllib.parse.urlparse(self.host)
+        scheme = parsed_url.scheme or "http"
+        server_ip = host_domain if host_domain else parsed_url.hostname
+
+        if sub_port:
+            port_str = f":{sub_port}"
+        elif parsed_url.port:
+            port_str = f":{parsed_url.port}"
+        else:
+            port_str = ""
+
+        sub_id = client.get("subId") or client.get("email") or client.get("id") or ""
+        return f"{scheme}://{server_ip}{port_str}/sub/{sub_id}"

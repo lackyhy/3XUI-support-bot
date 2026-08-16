@@ -11,7 +11,7 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Основн�
             InlineKeyboardButton(text="📊 Статус сервера", callback_data="menu_server")
         ])
         buttons.append([
-            InlineKeyboardButton(text="👥 Список всех клиентов", callback_data="menu_all_clients_0")
+            InlineKeyboardButton(text="👥 Клиенты", callback_data="menu_clients_hub")
         ])
         buttons.append([
             InlineKeyboardButton(text="🌐 Инбаунды (Подключения)", callback_data="menu_inbounds")
@@ -128,31 +128,65 @@ def inbound_detail_kb(inbound_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔙 К инбаундам", callback_data="menu_inbounds")]
     ])
 
-def all_clients_paginated_kb(items: List[Tuple[int, str, Dict[str, Any]]], page: int = 0, page_size: int = 8) -> InlineKeyboardMarkup:
+def clients_hub_kb(groups_summary: List[Tuple[str, int]], total_clients: int) -> InlineKeyboardMarkup:
     """
-    items: List of (inbound_id, inbound_remark, client_dict)
+    Keyboard for Clients Hub:
+    - Все клиенты (N)
+    - Group buttons (📁 Группа: Admins (1), 📁 Группа: server_connect (2), etc.)
     """
+    buttons = [
+        [
+            InlineKeyboardButton(text=f"🌐 Все клиенты ({total_clients})", callback_data="menu_all_clients_0")
+        ]
+    ]
+
+    for g_name, count in groups_summary:
+        disp_name = f"📁 Группа: {g_name} ({count})" if g_name != "none" else f"📂 Без группы ({count})"
+        buttons.append([
+            InlineKeyboardButton(text=disp_name, callback_data=f"menu_group_clients_{g_name}_0")
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(text="➕ Добавить клиента", callback_data="menu_add_client"),
+        InlineKeyboardButton(text="🔍 Поиск", callback_data="menu_search_client")
+    ])
+    buttons.append([InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def all_clients_paginated_kb(
+    items: List[Dict[str, Any]],
+    page: int = 0,
+    page_size: int = 8,
+    group_filter: Optional[str] = None
+) -> InlineKeyboardMarkup:
     buttons = []
     total_clients = len(items)
     start_idx = page * page_size
     end_idx = min(start_idx + page_size, total_clients)
 
+    grp_ctx = group_filter if group_filter else "all"
+
     page_items = items[start_idx:end_idx]
-    for ib_id, ib_remark, c in page_items:
-        email = c.get("email", "no-name")
-        enable = "🟢" if c.get("enable", True) else "🔴"
-        uuid_val = c.get("id") or c.get("password") or ""
+    for item in page_items:
+        email = item.get("email", "no-name")
+        ib_id = item.get("first_ib_id")
+        uuid_val = item.get("uuid_val", "")
+        enable_icon = "🟢" if item.get("enable", True) else "🔴"
+        summary = item.get("inbounds_summary", "")
+        
+        btn_text = f"{enable_icon} {email} ({summary})" if summary else f"{enable_icon} {email}"
         buttons.append([InlineKeyboardButton(
-            text=f"{enable} {email} ({ib_remark})",
-            callback_data=f"client_view_{ib_id}_{uuid_val}"
+            text=btn_text,
+            callback_data=f"client_view_{ib_id}_{uuid_val}_{grp_ctx}"
         )])
 
     # Pagination controls
+    cb_prefix = f"menu_group_clients_{group_filter}_" if group_filter else "menu_all_clients_"
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton(text="◀️ Назад", callback_data=f"menu_all_clients_{page-1}"))
+        nav_buttons.append(InlineKeyboardButton(text="◀️ Назад", callback_data=f"{cb_prefix}{page-1}"))
     if end_idx < total_clients:
-        nav_buttons.append(InlineKeyboardButton(text="Вперед ▶️", callback_data=f"menu_all_clients_{page+1}"))
+        nav_buttons.append(InlineKeyboardButton(text="Вперед ▶️", callback_data=f"{cb_prefix}{page+1}"))
     if nav_buttons:
         buttons.append(nav_buttons)
 
@@ -160,7 +194,7 @@ def all_clients_paginated_kb(items: List[Tuple[int, str, Dict[str, Any]]], page:
         InlineKeyboardButton(text="➕ Добавить клиента", callback_data="menu_add_client"),
         InlineKeyboardButton(text="🔍 Поиск", callback_data="menu_search_client")
     ])
-    buttons.append([InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu_main")])
+    buttons.append([InlineKeyboardButton(text="🔙 К разделу клиентов", callback_data="menu_clients_hub")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def clients_list_kb(inbound_id: int, clients: List[Dict[str, Any]], page: int = 0, page_size: int = 8) -> InlineKeyboardMarkup:
@@ -176,7 +210,7 @@ def clients_list_kb(inbound_id: int, clients: List[Dict[str, Any]], page: int = 
         uuid_val = c.get("id") or c.get("password") or ""
         buttons.append([InlineKeyboardButton(
             text=f"{enable} {email}",
-            callback_data=f"client_view_{inbound_id}_{uuid_val}"
+            callback_data=f"client_view_{inbound_id}_{uuid_val}_inbound{inbound_id}"
         )])
 
     # Pagination buttons
@@ -191,27 +225,139 @@ def clients_list_kb(inbound_id: int, clients: List[Dict[str, Any]], page: int = 
     buttons.append([InlineKeyboardButton(text="🔙 К инбаунду", callback_data=f"inbound_view_{inbound_id}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def client_detail_kb(inbound_id: int, uuid_val: str, email: str, is_enabled: bool) -> InlineKeyboardMarkup:
+def client_detail_kb(inbound_id: int, uuid_val: str, email: str, is_enabled: bool, group_filter: str = "all") -> InlineKeyboardMarkup:
     status_btn_text = "🔴 Деактивировать" if is_enabled else "🟢 Активировать"
+    if group_filter.startswith("inbound"):
+        ib_num = group_filter.replace("inbound", "")
+        back_cb = f"clients_list_{ib_num}_0"
+    elif group_filter == "all":
+        back_cb = "menu_all_clients_0"
+    else:
+        back_cb = f"menu_group_clients_{group_filter}_0"
+
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🔑 Ссылка и QR-код", callback_data=f"client_key_{inbound_id}_{uuid_val}"),
+            InlineKeyboardButton(text="🔑 Ссылка и QR-код", callback_data=f"client_key_select_{inbound_id}_{uuid_val}"),
             InlineKeyboardButton(text=status_btn_text, callback_data=f"client_toggle_{inbound_id}_{uuid_val}")
+        ],
+        [
+            InlineKeyboardButton(text="🌐 Привязка к инбаундам", callback_data=f"client_manage_ibs_{inbound_id}_{uuid_val}")
         ],
         [
             InlineKeyboardButton(text="📈 Изменить лимит ГБ", callback_data=f"client_edit_gb_{inbound_id}_{uuid_val}"),
             InlineKeyboardButton(text="📅 Изменить срок", callback_data=f"client_edit_exp_{inbound_id}_{uuid_val}")
         ],
         [
-            InlineKeyboardButton(text="🌐 Изменить инбаунд", callback_data=f"client_move_inbound_{inbound_id}_{uuid_val}"),
+            InlineKeyboardButton(text="🔄 Сбросить трафик", callback_data=f"client_reset_{inbound_id}_{email}"),
             InlineKeyboardButton(text="🧹 Сбросить IP", callback_data=f"client_clearip_{email}")
         ],
-        [
-            InlineKeyboardButton(text="🔄 Сбросить трафик", callback_data=f"client_reset_{inbound_id}_{email}"),
-            InlineKeyboardButton(text="🗑 Удалить клиента", callback_data=f"client_delete_confirm_{inbound_id}_{uuid_val}")
-        ],
-        [InlineKeyboardButton(text="🔙 К списку клиентов", callback_data=f"clients_list_{inbound_id}_0")]
+        [InlineKeyboardButton(text="🗑 Удалить клиента", callback_data=f"client_delete_confirm_{inbound_id}_{uuid_val}")],
+        [InlineKeyboardButton(text="🔙 К списку клиентов", callback_data=back_cb)]
     ])
+
+def client_key_choice_kb(inbound_id: int, uuid_val: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="🌐 1. Ссылка подписки (Subscription)",
+                callback_data=f"client_key_type_sub_{inbound_id}_{uuid_val}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔌 2. Прямой коннект (Direct VLESS/VMess)",
+                callback_data=f"client_key_type_direct_{inbound_id}_{uuid_val}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔙 К профилю клиента",
+                callback_data=f"client_view_{inbound_id}_{uuid_val}"
+            )
+        ]
+    ])
+
+def manage_client_inbounds_kb(
+    curr_inbound_id: int,
+    uuid_val: str,
+    email: str,
+    all_inbounds: List[Dict[str, Any]],
+    attached_inbound_ids: List[int]
+) -> InlineKeyboardMarkup:
+    buttons = []
+    for ib in all_inbounds:
+        ib_id = ib.get("id")
+        remark = ib.get("remark", f"Inbound #{ib_id}")
+        protocol = ib.get("protocol", "").upper()
+        port = ib.get("port")
+        is_attached = (ib_id in attached_inbound_ids)
+        
+        prefix = "✅ " if is_attached else "❌ "
+        action = "detach" if is_attached else "attach"
+        
+        btn_text = f"{prefix}{remark} ({protocol}:{port})"
+        buttons.append([InlineKeyboardButton(
+            text=btn_text,
+            callback_data=f"client_ib_{action}_{curr_inbound_id}_{ib_id}_{uuid_val}"
+        )])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="🌐 Привязать КО ВСЕМ инбаундам",
+            callback_data=f"client_ib_attach_all_{curr_inbound_id}_{uuid_val}"
+        )
+    ])
+    buttons.append([
+        InlineKeyboardButton(
+            text="🔙 К профилю клиента",
+            callback_data=f"client_view_{curr_inbound_id}_{uuid_val}"
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def add_client_inbounds_multiselect_kb(
+    inbounds: List[Dict[str, Any]],
+    selected_ids: List[int]
+) -> InlineKeyboardMarkup:
+    buttons = []
+    for ib in inbounds:
+        ib_id = ib.get("id")
+        remark = ib.get("remark", f"Inbound #{ib_id}")
+        protocol = ib.get("protocol", "").upper()
+        port = ib.get("port")
+        
+        is_selected = (ib_id in selected_ids)
+        prefix = "✅ " if is_selected else "➕ "
+        
+        btn_text = f"{prefix}{remark} ({protocol}:{port})"
+        buttons.append([InlineKeyboardButton(
+            text=btn_text,
+            callback_data=f"add_client_toggle_ib_{ib_id}"
+        )])
+
+    all_selected = (len(selected_ids) == len(inbounds))
+    if all_selected:
+        buttons.append([InlineKeyboardButton(
+            text="❌ Снять выбор со ВСЕХ",
+            callback_data="add_client_toggle_all_off"
+        )])
+    else:
+        buttons.append([InlineKeyboardButton(
+            text="🌐 Выбрать ВСЕ инбаунды",
+            callback_data="add_client_toggle_all_on"
+        )])
+
+    count = len(selected_ids)
+    buttons.append([InlineKeyboardButton(
+        text=f"✅ Продолжить (выбрано: {count})",
+        callback_data="add_client_confirm_inbounds"
+    )])
+    buttons.append([InlineKeyboardButton(
+        text="❌ Отмена",
+        callback_data="cancel_action"
+    )])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def select_new_inbound_kb(current_inbound_id: int, uuid_val: str, inbounds: List[Dict[str, Any]]) -> InlineKeyboardMarkup:
     buttons = []

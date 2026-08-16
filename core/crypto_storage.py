@@ -139,6 +139,15 @@ def rename_panel(panel_id: str, new_name: str) -> bool:
         return True
     return False
 
+def update_sub_port(panel_id: str, sub_port: int) -> bool:
+    storage = load_raw_storage()
+    panels = storage.get("panels", {})
+    if panel_id in panels:
+        panels[panel_id]["sub_port"] = sub_port
+        save_raw_storage(storage)
+        return True
+    return False
+
 def derive_default_panel_name(host_url: str) -> str:
     import urllib.parse, socket
     try:

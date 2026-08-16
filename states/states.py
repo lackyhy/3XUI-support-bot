@@ -31,3 +31,6 @@ class EditClientExpiryStates(StatesGroup):
 
 class SearchClientStates(StatesGroup):
     waiting_for_query = State()
+
+class SetSubPortStates(StatesGroup):
+    waiting_for_sub_port = State()

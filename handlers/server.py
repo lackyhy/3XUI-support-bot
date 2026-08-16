@@ -126,12 +126,18 @@ async def cb_server_status(callback: CallbackQuery):
     tcp_count = obj.get("tcpCount", 0)
     udp_count = obj.get("udpCount", 0)
 
-    # Net Traffic
-    net_io = obj.get("netIO", {}) if isinstance(obj.get("netIO"), dict) else {}
-    up_bytes = net_io.get("up", 0)
-    down_bytes = net_io.get("down", 0)
+    # Net Traffic (Total Data)
+    net_traffic = obj.get("netTraffic") if isinstance(obj.get("netTraffic"), dict) else {}
+    if net_traffic and ("sent" in net_traffic or "recv" in net_traffic):
+        up_bytes = net_traffic.get("sent", 0)
+        down_bytes = net_traffic.get("recv", 0)
+    else:
+        net_io = obj.get("netIO") if isinstance(obj.get("netIO"), dict) else {}
+        up_bytes = net_io.get("up", 0) or net_io.get("sent", 0)
+        down_bytes = net_io.get("down", 0) or net_io.get("recv", 0)
+
     total_bytes = up_bytes + down_bytes
-    traffic_str = f"{format_bytes(total_bytes)} (↑{format_bytes(up_bytes)},↓{format_bytes(down_bytes)})"
+    traffic_str = f"{format_bytes(total_bytes)} (↑{format_bytes(up_bytes)}, ↓{format_bytes(down_bytes)})"
 
     await client.close()
 

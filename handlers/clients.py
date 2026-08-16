@@ -7,9 +7,10 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
-from core.api_client import ThreeXUIClient, format_bytes, ensure_dict
+from core.api_client import ThreeXUIClient, format_bytes, ensure_dict, extract_external_sub
+from core import crypto_storage
 from keyboards import inline as keyboards
-from states.states import AddClientStates, SearchClientStates, EditClientGBStates, EditClientExpiryStates
+from states.states import AddClientStates, SearchClientStates, EditClientGBStates, EditClientExpiryStates, SetSubPortStates
 
 router = Router()
 
@@ -18,6 +19,144 @@ def format_timestamp(ms: int) -> str:
         return "♾ Безлимитно"
     dt = datetime.datetime.fromtimestamp(ms / 1000.0)
     return dt.strftime("%d.%m.%Y %H:%M")
+
+@router.callback_query(F.data == "menu_clients_hub")
+async def cb_clients_hub(callback: CallbackQuery):
+    client_api = ThreeXUIClient.from_storage()
+    if not client_api:
+        await callback.answer("Ошибка авторизации", show_alert=True)
+        return
+
+    await callback.answer("Загрузка раздела клиентов...")
+    res = await client_api.get_inbounds()
+    await client_api.close()
+
+    if not res.get("success"):
+        await callback.message.edit_text(
+            f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
+            reply_markup=keyboards.main_menu_kb(),
+            parse_mode="Markdown"
+        )
+        return
+
+    inbounds = res.get("obj", [])
+    unique_clients = {}
+
+    for ib in inbounds:
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        for c in clients:
+            email = c.get("email", "no-name")
+            group = c.get("group") or "none"
+            if email not in unique_clients:
+                unique_clients[email] = group
+
+    total_clients = len(unique_clients)
+    if total_clients == 0:
+        await callback.message.edit_text(
+            "👥 **Раздел клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
+            reply_markup=keyboards.main_menu_kb(),
+            parse_mode="Markdown"
+        )
+        return
+
+    # Count clients per group
+    group_counts = {}
+    for email, grp in unique_clients.items():
+        group_counts[grp] = group_counts.get(grp, 0) + 1
+
+    groups_summary = [(grp, count) for grp, count in group_counts.items()]
+
+    text = (
+        f"👥 **Раздел клиентов**\n\n"
+        f"Всего клиентов в системе: **{total_clients}**\n\n"
+        f"Выберите **Все клиенты** или просмотрите список по конкретным группам:"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=keyboards.clients_hub_kb(groups_summary, total_clients),
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data.startswith("menu_group_clients_"))
+async def cb_group_clients(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    group_filter = parts[3]
+    page = int(parts[4])
+
+    client_api = ThreeXUIClient.from_storage()
+    if not client_api:
+        await callback.answer("Ошибка авторизации", show_alert=True)
+        return
+
+    await callback.answer("Загрузка клиентов группы...")
+    res = await client_api.get_inbounds()
+    await client_api.close()
+
+    if not res.get("success"):
+        await callback.message.edit_text(
+            f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
+            reply_markup=keyboards.main_menu_kb(),
+            parse_mode="Markdown"
+        )
+        return
+
+    inbounds = res.get("obj", [])
+    unique_clients = {}
+
+    for ib in inbounds:
+        ib_id = ib.get("id")
+        ib_remark = ib.get("remark", f"#{ib_id}")
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        for c in clients:
+            email = c.get("email", "no-name")
+            grp = c.get("group") or "none"
+            if group_filter != "all" and grp != group_filter:
+                continue
+
+            uuid_val = c.get("id") or c.get("password") or ""
+            enable = c.get("enable", True)
+
+            if email not in unique_clients:
+                unique_clients[email] = {
+                    "email": email,
+                    "first_ib_id": ib_id,
+                    "uuid_val": uuid_val,
+                    "enable": enable,
+                    "group": grp,
+                    "inbounds": [ib_remark]
+                }
+            else:
+                unique_clients[email]["inbounds"].append(ib_remark)
+
+    items = []
+    for email, info in unique_clients.items():
+        ibs = info["inbounds"]
+        summary = ibs[0] if len(ibs) == 1 else f"{ibs[0]} +{len(ibs)-1}"
+        info["inbounds_summary"] = summary
+        items.append(info)
+
+    disp_group_title = f"Группа `{group_filter}`" if group_filter != "none" else "Без группы"
+    text = (
+        f"📁 **Клиенты — {disp_group_title}**\n\n"
+        f"Пользователей в группе: **{len(items)}**\n"
+        "Выберите клиента для управления:"
+    )
+
+    from aiogram.exceptions import TelegramBadRequest
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.all_clients_paginated_kb(items, page, group_filter=group_filter),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            raise e
 
 @router.callback_query(F.data.startswith("menu_all_clients_"))
 async def cb_all_clients(callback: CallbackQuery):
@@ -41,16 +180,30 @@ async def cb_all_clients(callback: CallbackQuery):
         return
 
     inbounds = res.get("obj", [])
-    all_clients = []
+    unique_clients = {}
+
     for ib in inbounds:
         ib_id = ib.get("id")
         ib_remark = ib.get("remark", f"#{ib_id}")
         settings = ensure_dict(ib.get("settings"))
         clients = settings.get("clients", [])
         for c in clients:
-            all_clients.append((ib_id, ib_remark, c))
+            email = c.get("email", "no-name")
+            uuid_val = c.get("id") or c.get("password") or ""
+            enable = c.get("enable", True)
 
-    if not all_clients:
+            if email not in unique_clients:
+                unique_clients[email] = {
+                    "email": email,
+                    "first_ib_id": ib_id,
+                    "uuid_val": uuid_val,
+                    "enable": enable,
+                    "inbounds": [ib_remark]
+                }
+            else:
+                unique_clients[email]["inbounds"].append(ib_remark)
+
+    if not unique_clients:
         await callback.message.edit_text(
             "👥 **Список всех клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
             reply_markup=keyboards.main_menu_kb(),
@@ -58,11 +211,21 @@ async def cb_all_clients(callback: CallbackQuery):
         )
         return
 
-    active_count = sum(1 for _, _, c in all_clients if c.get("enable", True))
+    items = []
+    for email, info in unique_clients.items():
+        ibs = info["inbounds"]
+        if len(ibs) == 1:
+            summary = ibs[0]
+        else:
+            summary = f"{ibs[0]} +{len(ibs)-1}"
+        info["inbounds_summary"] = summary
+        items.append(info)
+
+    active_count = sum(1 for item in items if item.get("enable", True))
 
     text = (
-        f"👥 **Все клиенты панели 3x-ui**\n\n"
-        f"Всего пользователей: **{len(all_clients)}** (Активных: **{active_count}**)\n"
+        f"🌐 **Все клиенты панели 3x-ui**\n\n"
+        f"Уникальных пользователей: **{len(items)}** (Активных: **{active_count}**)\n"
         "Выберите клиента для управления:"
     )
 
@@ -70,7 +233,7 @@ async def cb_all_clients(callback: CallbackQuery):
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.all_clients_paginated_kb(all_clients, page),
+            reply_markup=keyboards.all_clients_paginated_kb(items, page),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
@@ -84,28 +247,38 @@ async def cb_view_client(callback: CallbackQuery):
     parts = callback.data.split("_")
     inbound_id = int(parts[2])
     uuid_val = parts[3]
+    group_filter = parts[4] if len(parts) > 4 else "all"
 
     client_api = ThreeXUIClient.from_storage()
     if not client_api:
         await callback.answer(" Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer()
-    inbound = await client_api.get_inbound(inbound_id)
+    await callback.answer("Загрузка профиля...")
+    res = await client_api.get_inbounds()
     await client_api.close()
 
-    if not inbound:
-        await callback.message.edit_text("❌ Инбаунд не найден.", reply_markup=keyboards.main_menu_kb())
+    if not res.get("success"):
+        await callback.message.edit_text("❌ Ошибка загрузки инбаундов.", reply_markup=keyboards.main_menu_kb())
         return
 
-    settings = ensure_dict(inbound.get("settings"))
-    clients = settings.get("clients", [])
-    
+    inbounds = res.get("obj", [])
+    attached_inbounds = []
     target_client = None
-    for c in clients:
-        if (c.get("id") == uuid_val) or (c.get("password") == uuid_val):
-            target_client = c
-            break
+
+    for ib in inbounds:
+        ib_id = ib.get("id")
+        ib_remark = ib.get("remark", f"#{ib_id}")
+        protocol = ib.get("protocol", "").upper()
+        port = ib.get("port")
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        
+        for c in clients:
+            if (c.get("id") == uuid_val) or (c.get("password") == uuid_val):
+                attached_inbounds.append(f"• **{ib_remark}** (`{protocol}:{port}`)")
+                if not target_client:
+                    target_client = c
 
     if not target_client:
         await callback.message.edit_text("❌ Клиент не найден.", reply_markup=keyboards.inbound_detail_kb(inbound_id))
@@ -114,45 +287,138 @@ async def cb_view_client(callback: CallbackQuery):
     email = target_client.get("email", "no-name")
     is_enabled = target_client.get("enable", True)
     status_str = "🟢 Активен" if is_enabled else "🔴 Отключен"
+    group_name = target_client.get("group") if target_client.get("group") else "—"
 
-    # Search client traffic in clientStats
-    client_stats = inbound.get("clientStats", [])
+    # Search client traffic across inbounds using max to avoid multi-inbound duplication
     used_up = 0
     used_down = 0
-    for stat in client_stats:
-        if stat.get("email") == email:
-            used_up = stat.get("up", 0)
-            used_down = stat.get("down", 0)
-            break
+    for ib in inbounds:
+        client_stats = ib.get("clientStats", [])
+        for stat in client_stats:
+            if stat.get("email") == email or stat.get("uuid") == uuid_val or stat.get("id") == uuid_val:
+                used_up = max(used_up, stat.get("up", 0))
+                used_down = max(used_down, stat.get("down", 0))
 
     used_total = used_up + used_down
+    traffic_str = f"📊 **Использовано:** `{format_bytes(used_total)}` (⬆️ {format_bytes(used_up)} | ⬇️ {format_bytes(used_down)})"
+
     total_gb_limit = target_client.get("totalGB", 0)
     limit_str = format_bytes(total_gb_limit) if total_gb_limit > 0 else "♾ Безлимитно"
     expiry_str = format_timestamp(target_client.get("expiryTime", 0))
     limit_ip = target_client.get("limitIp", 0)
     limit_ip_str = f"{limit_ip} устройства" if limit_ip > 0 else "♾ Без ограничений"
 
+    attached_count = len(attached_inbounds)
+    attached_text = "\n".join(attached_inbounds) if attached_inbounds else "• *Не привязан ни к одному инбаунду*"
+
+    import urllib.parse
+    active_panel = crypto_storage.get_active_panel()
+    sub_port = active_panel.get("sub_port") if active_panel else None
+    parsed_host = urllib.parse.urlparse(client_api.host).hostname
+
+    sub_url = client_api.generate_subscription_link(target_client, parsed_host, sub_port=sub_port)
+
     text = (
         f"👤 **Профиль клиента: {email}**\n\n"
         f"🆔 **UUID / Pass:** `{uuid_val}`\n"
+        f"👥 **Группа:** `{group_name}`\n"
         f"Статус: **{status_str}**\n\n"
-        f"📊 **Использовано:** `{format_bytes(used_total)}` (⬆️ {format_bytes(used_up)} | ⬇️ {format_bytes(used_down)})\n"
+        f"🌐 **Привязан к инбаундам ({attached_count}):**\n"
+        f"{attached_text}\n\n"
+        f"🌐 **Ссылка подписки:** `{sub_url}`\n\n"
+        f"{traffic_str}\n"
         f"📈 **Лимит трафика:** `{limit_str}`\n"
         f"📅 **Истекает:** `{expiry_str}`\n"
         f"📱 **Лимит IP:** `{limit_ip_str}`\n"
     )
 
+    # If returning from photo message, delete photo first
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            text,
+            reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled, group_filter=group_filter),
+            parse_mode="Markdown"
+        )
+    else:
+        from aiogram.exceptions import TelegramBadRequest
+        try:
+            await callback.message.edit_text(
+                text,
+                reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled, group_filter=group_filter),
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                pass
+            else:
+                await callback.message.answer(
+                    text,
+                    reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled),
+                    parse_mode="Markdown"
+                )
+
+@router.callback_query(F.data.startswith("client_key_select_"))
+async def cb_client_key_select(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    inbound_id = int(parts[3])
+    uuid_val = parts[4]
+
+    client_api = ThreeXUIClient.from_storage()
+    if not client_api:
+        await callback.answer("Ошибка авторизации", show_alert=True)
+        return
+
+    inbound = await client_api.get_inbound(inbound_id)
+    await client_api.close()
+
+    email = "пользователя"
+    if inbound:
+        settings = ensure_dict(inbound.get("settings"))
+        clients = settings.get("clients", [])
+        target_client = next((c for c in clients if c.get("id") == uuid_val or c.get("password") == uuid_val), None)
+        if target_client:
+            email = target_client.get("email", "no-name")
+
     await callback.message.edit_text(
-        text,
-        reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled),
+        f"🔑 **Выберите тип ключа для `{email}`:**\n\n"
+        f"1️⃣ **🌐 Ссылка подписки (Subscription)**\n"
+        f"Авто-обновляемая ссылка подписки для Happ, v2rayNG, Streisand, NekoBox.\n\n"
+        f"2️⃣ **🔌 Прямой коннект (Direct Link)**\n"
+        f"Прямая ссылка ключа (`vless://`, `vmess://`, `trojan://`) для быстрой вставки.",
+        reply_markup=keyboards.client_key_choice_kb(inbound_id, uuid_val),
         parse_mode="Markdown"
     )
+    await callback.answer()
 
-@router.callback_query(F.data.startswith("client_key_"))
-async def cb_client_key(callback: CallbackQuery):
+@router.callback_query(F.data.startswith("client_key_type_"))
+async def cb_generate_key(callback: CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
-    inbound_id = int(parts[2])
-    uuid_val = parts[3]
+    key_type = parts[3]
+    inbound_id = int(parts[4])
+    uuid_val = parts[5]
+
+    active_panel = crypto_storage.get_active_panel()
+    sub_port = active_panel.get("sub_port") if active_panel else None
+
+    # If generating subscription link for the first time and sub_port is not set:
+    if key_type == "sub" and not sub_port:
+        await state.update_data(sub_inbound_id=inbound_id, sub_uuid_val=uuid_val, panel_id=active_panel.get("id"))
+        await state.set_state(SetSubPortStates.waiting_for_sub_port)
+
+        import urllib.parse
+        parsed = urllib.parse.urlparse(active_panel.get("host", ""))
+        default_port = parsed.port or 2096
+
+        await callback.message.edit_text(
+            f"🌐 **Первоначальная настройка Порта Подписок (Subscription Port)**\n\n"
+            f"Укажите **Порт подписок** вашего сервера 3x-ui (например: `2096`, `2053`, `8080`, `8443` или `{default_port}`):\n\n"
+            f"*(Бот автоматически сохранит этот порт для сервера `{active_panel.get('name')}`)*",
+            reply_markup=keyboards.cancel_kb(),
+            parse_mode="Markdown"
+        )
+        await callback.answer()
+        return
 
     client_api = ThreeXUIClient.from_storage()
     if not client_api:
@@ -175,11 +441,22 @@ async def cb_client_key(callback: CallbackQuery):
         await client_api.close()
         return
 
-    # Extract host or IP from panel host
     import urllib.parse
     parsed_host = urllib.parse.urlparse(client_api.host).hostname
 
-    link = client_api.generate_client_link(inbound, target_client, parsed_host)
+    if key_type == "sub":
+        # Check if client already has external sub URL set in panel (via externalLinks or subLink)
+        client_detail_res = await client_api.get_client(target_client.get("email", ""))
+        ext_sub = extract_external_sub(client_detail_res) or extract_external_sub(target_client)
+        if ext_sub:
+            link = ext_sub
+        else:
+            link = client_api.generate_subscription_link(target_client, parsed_host, sub_port=sub_port)
+        title_str = f"🌐 **Ссылка подписки для `{target_client.get('email')}`**"
+    else:
+        link = client_api.generate_client_link(inbound, target_client, parsed_host)
+        title_str = f"🔌 **Ссылка подключения (Direct) для `{target_client.get('email')}`**"
+
     await client_api.close()
 
     # Generate QR Code image
@@ -195,9 +472,9 @@ async def cb_client_key(callback: CallbackQuery):
     photo_file = BufferedInputFile(img_buffer.getvalue(), filename=f"{target_client.get('email', 'vpn')}.png")
 
     caption = (
-        f"🔑 **Ссылка подключения для `{target_client.get('email')}`**\n\n"
+        f"{title_str}\n\n"
         f"```\n{link}\n```\n"
-        "Отсканируйте QR-код приложением (v2rayNG, Happ, Streisand, NekoBox, FoXray)."
+        "Отсканируйте QR-код приложением (Happ, v2rayNG, Streisand, NekoBox, FoXray)."
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -210,6 +487,82 @@ async def cb_client_key(callback: CallbackQuery):
         reply_markup=kb,
         parse_mode="Markdown"
     )
+
+@router.message(SetSubPortStates.waiting_for_sub_port)
+async def process_set_sub_port(message: Message, state: FSMContext):
+    try:
+        sub_port = int(message.text.strip())
+        if sub_port <= 0 or sub_port > 65535:
+            raise ValueError()
+    except ValueError:
+        await message.answer("❌ Укажите корректный порт числом от 1 до 65535 (например `2096`):", reply_markup=keyboards.cancel_kb())
+        return
+
+    data = await state.get_data()
+    await state.clear()
+
+    panel_id = data.get("panel_id")
+    inbound_id = data.get("sub_inbound_id")
+    uuid_val = data.get("sub_uuid_val")
+
+    if panel_id:
+        crypto_storage.update_sub_port(panel_id, sub_port)
+
+    status_msg = await message.answer("🔄 **Генерация ссылки подписки...**", parse_mode="Markdown")
+    client_api = ThreeXUIClient.from_storage()
+    if not client_api:
+        await status_msg.edit_text("❌ Ошибка авторизации.")
+        return
+
+    inbound = await client_api.get_inbound(inbound_id)
+    if not inbound:
+        await status_msg.edit_text("❌ Инбаунд не найден.")
+        await client_api.close()
+        return
+
+    settings = ensure_dict(inbound.get("settings"))
+    clients = settings.get("clients", [])
+    target_client = next((c for c in clients if c.get("id") == uuid_val or c.get("password") == uuid_val), None)
+
+    if not target_client:
+        await status_msg.edit_text("❌ Клиент не найден.")
+        await client_api.close()
+        return
+
+    import urllib.parse
+    parsed_host = urllib.parse.urlparse(client_api.host).hostname
+    link = client_api.generate_subscription_link(target_client, parsed_host, sub_port=sub_port)
+    await client_api.close()
+
+    # Generate QR Code image
+    qr = qrcode.QRCode(version=1, box_size=8, border=2)
+    qr.add_data(link)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    img_buffer = io.BytesIO()
+    img.save(img_buffer, format="PNG")
+    img_buffer.seek(0)
+
+    photo_file = BufferedInputFile(img_buffer.getvalue(), filename=f"{target_client.get('email', 'vpn')}.png")
+
+    caption = (
+        f"🌐 **Ссылка подписки для `{target_client.get('email')}`**\n\n"
+        f"```\n{link}\n```\n"
+        "Отсканируйте QR-код приложением (Happ, v2rayNG, Streisand, NekoBox, FoXray)."
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 К профилю клиента", callback_data=f"client_view_{inbound_id}_{uuid_val}")]
+    ])
+
+    await message.answer_photo(
+        photo=photo_file,
+        caption=caption,
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+    await status_msg.delete()
 
 @router.callback_query(F.data.startswith("client_toggle_"))
 async def cb_toggle_client(callback: CallbackQuery):
@@ -360,37 +713,99 @@ async def cb_add_client_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    if len(inbounds) == 1:
-        # Auto select single inbound
-        await state.update_data(inbound_id=inbounds[0].get("id"))
-        await state.set_state(AddClientStates.waiting_for_email)
-        await callback.message.edit_text(
-            "➕ **Добавление нового клиента** (Шаг 1 из 4)\n\nВведите **Email / Имя клиента** (например: `alex_vpn`):",
-            reply_markup=keyboards.cancel_kb(),
-            parse_mode="Markdown"
-        )
-    else:
-        buttons = []
-        for ib in inbounds:
-            btn_text = f"{ib.get('remark')} ({ib.get('protocol').upper()}:{ib.get('port')})"
-            buttons.append([InlineKeyboardButton(text=btn_text, callback_data=f"add_client_to_{ib.get('id')}")])
-        buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")])
+    selected_ids = []
+    await state.update_data(all_inbounds=inbounds, selected_inbound_ids=selected_ids)
 
+    await callback.message.edit_text(
+        "➕ **Выберите инбаунды для добавления клиента:**\n\n"
+        "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
+        "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!",
+        reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("add_client_toggle_ib_"))
+async def cb_add_client_toggle_ib(callback: CallbackQuery, state: FSMContext):
+    target_ib_id = int(callback.data.split("_")[4])
+    data = await state.get_data()
+    inbounds = data.get("all_inbounds", [])
+    selected_ids = data.get("selected_inbound_ids", [])
+
+    if target_ib_id in selected_ids:
+        selected_ids.remove(target_ib_id)
+        await callback.answer("Инбаунд убран из выбора")
+    else:
+        selected_ids.append(target_ib_id)
+        await callback.answer("Инбаунд добавлен в выбор")
+
+    await state.update_data(selected_inbound_ids=selected_ids)
+
+    from aiogram.exceptions import TelegramBadRequest
+    try:
         await callback.message.edit_text(
-            "➕ **Выберите инбаунд для добавления клиента:**",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            "➕ **Выберите инбаунды для добавления клиента:**\n\n"
+            "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
+            "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!",
+            reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids),
             parse_mode="Markdown"
         )
+    except TelegramBadRequest:
+        pass
+
+@router.callback_query(F.data.startswith("add_client_toggle_all_"))
+async def cb_add_client_toggle_all(callback: CallbackQuery, state: FSMContext):
+    action = callback.data.split("_")[4]
+    data = await state.get_data()
+    inbounds = data.get("all_inbounds", [])
+
+    if action == "on":
+        selected_ids = [ib.get("id") for ib in inbounds]
+        await callback.answer("Выбраны все инбаунды!")
+    else:
+        selected_ids = []
+        await callback.answer("Выбор сброшен")
+
+    await state.update_data(selected_inbound_ids=selected_ids)
+
+    from aiogram.exceptions import TelegramBadRequest
+    try:
+        await callback.message.edit_text(
+            "➕ **Выберите инбаунды для добавления клиента:**\n\n"
+            "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
+            "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!",
+            reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest:
+        pass
+
+@router.callback_query(F.data == "add_client_confirm_inbounds")
+async def cb_add_client_confirm_inbounds(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    selected_ids = data.get("selected_inbound_ids", [])
+    if not selected_ids:
+        await callback.answer("⚠️ Пожалуйста, выберите хотя бы один инбаунд!", show_alert=True)
+        return
+
+    await state.set_state(AddClientStates.waiting_for_email)
+    await callback.message.edit_text(
+        f"➕ **Добавление нового клиента** (Шаг 1 из 5)\n\n"
+        f"Выбрано подключений: **{len(selected_ids)}**\n\n"
+        f"Введите **Email / Имя клиента** (например: `alex_vpn`):",
+        reply_markup=keyboards.cancel_kb(),
+        parse_mode="Markdown"
+    )
     await callback.answer()
 
 @router.callback_query(F.data.startswith("add_client_to_"))
 async def cb_add_client_select_inbound(callback: CallbackQuery, state: FSMContext):
     inbound_id = int(callback.data.split("_")[3])
-    await state.update_data(inbound_id=inbound_id)
+    await state.update_data(selected_inbound_ids=[inbound_id])
     await state.set_state(AddClientStates.waiting_for_email)
 
     await callback.message.edit_text(
-        "➕ **Добавление нового клиента** (Шаг 1 из 4)\n\nВведите **Email / Имя клиента** (например: `alex_vpn`):",
+        "➕ **Добавление нового клиента** (Шаг 1 из 5)\n\nВведите **Email / Имя клиента** (например: `alex_vpn`):",
         reply_markup=keyboards.cancel_kb(),
         parse_mode="Markdown"
     )
@@ -407,7 +822,7 @@ async def process_add_email(message: Message, state: FSMContext):
     await state.set_state(AddClientStates.waiting_for_limit_gb)
 
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 2 из 4)\n\n"
+        "➕ **Добавление нового клиента** (Шаг 2 из 5)\n\n"
         "Укажите **Лимит трафика в ГБ** (например: `50` или `0` для безлимита):",
         reply_markup=keyboards.cancel_kb(),
         parse_mode="Markdown"
@@ -427,7 +842,7 @@ async def process_add_gb(message: Message, state: FSMContext):
     await state.set_state(AddClientStates.waiting_for_expiry_days)
 
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 3 из 4)\n\n"
+        "➕ **Добавление нового клиента** (Шаг 3 из 5)\n\n"
         "Укажите **Срок действия в днях** (например: `30` или `0` для бессрочного):",
         reply_markup=keyboards.cancel_kb(),
         parse_mode="Markdown"
@@ -447,7 +862,7 @@ async def process_add_expiry(message: Message, state: FSMContext):
     await state.set_state(AddClientStates.waiting_for_limit_ip)
 
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 4 из 4)\n\n"
+        "➕ **Добавление нового клиента** (Шаг 4 из 5)\n\n"
         "Укажите **Лимит IP / Устройств** (например: `2` или `0` для безлимита):",
         reply_markup=keyboards.cancel_kb(),
         parse_mode="Markdown"
@@ -482,7 +897,11 @@ async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.clear()
 
-    inbound_id = data.get("inbound_id")
+    selected_ids = data.get("selected_inbound_ids", [])
+    if not selected_ids:
+        selected_ids = [data.get("inbound_id", 1)]
+    first_inbound_id = selected_ids[0]
+
     email = data.get("email")
     limit_gb = data.get("limit_gb")
     expiry_days = data.get("expiry_days")
@@ -498,7 +917,7 @@ async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
         return
 
     res = await client_api.add_client(
-        inbound_id=inbound_id,
+        inbound_id=first_inbound_id,
         email=email,
         uuid_str=client_uuid,
         total_gb=limit_gb,
@@ -508,20 +927,24 @@ async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
     )
 
     if res.get("success"):
+        if len(selected_ids) > 1:
+            await client_api.attach_client_to_inbounds(email, selected_ids)
+
         st_text = "🟢 Включен (Активен)" if enable_val else "🔴 Отключен (Не подключен)"
         await status_msg.edit_text(
             f"✅ **Клиент `{email}` успешно создан!**\n\n"
             f"🆔 UUID: `{client_uuid}`\n"
             f"Статус соединения: **{st_text}**\n"
+            f"🌐 Привязан к инбаундам: **{len(selected_ids)} шт.**\n"
             f"📊 Лимит ГБ: `{limit_gb if limit_gb > 0 else 'Безлимит'}`\n"
             f"📅 Срок: `{expiry_days if expiry_days > 0 else 'Бессрочно'} дн.`",
-            reply_markup=keyboards.client_detail_kb(inbound_id, client_uuid, email, enable_val),
+            reply_markup=keyboards.client_detail_kb(first_inbound_id, client_uuid, email, enable_val),
             parse_mode="Markdown"
         )
     else:
         await status_msg.edit_text(
             f"❌ **Ошибка при создании клиента:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.inbound_detail_kb(inbound_id),
+            reply_markup=keyboards.inbound_detail_kb(first_inbound_id),
             parse_mode="Markdown"
         )
     await client_api.close()
@@ -880,3 +1303,156 @@ async def cb_do_move_inbound(callback: CallbackQuery):
         reply_markup=keyboards.client_detail_kb(new_inbound_id, uuid_val, email, enable),
         parse_mode="Markdown"
     )
+
+# MANAGE CLIENT INBOUND ATTACHMENTS
+@router.callback_query(F.data.startswith("client_manage_ibs_"))
+async def cb_manage_client_inbounds(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    curr_inbound_id = int(parts[3])
+    uuid_val = parts[4]
+
+    client_api = ThreeXUIClient.from_storage()
+    if not client_api:
+        await callback.answer("Ошибка авторизации", show_alert=True)
+        return
+
+    await callback.answer("Загрузка инбаундов...")
+    res = await client_api.get_inbounds()
+    await client_api.close()
+
+    if not res.get("success"):
+        await callback.message.edit_text("❌ Ошибка получения инбаундов.")
+        return
+
+    inbounds = res.get("obj", [])
+    attached_ids = []
+    target_client = None
+
+    for ib in inbounds:
+        ib_id = ib.get("id")
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        for c in clients:
+            if c.get("id") == uuid_val or c.get("password") == uuid_val:
+                attached_ids.append(ib_id)
+                if not target_client:
+                    target_client = c
+
+    if not target_client:
+        await callback.message.edit_text("❌ Клиент не найден.")
+        return
+
+    email = target_client.get("email", "no-name")
+
+    text = (
+        f"🌐 **Привязка клиента к инбаундам** (`{email}`)\n\n"
+        f"Нажмите на инбаунд для включения/отключения привязки:\n"
+        f"• ✅ — Клиент подключен\n"
+        f"• ❌ — Клиент не подключен"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=keyboards.manage_client_inbounds_kb(curr_inbound_id, uuid_val, email, inbounds, attached_ids),
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data.startswith("client_ib_attach_") | F.data.startswith("client_ib_detach_"))
+async def cb_toggle_attach_inbound(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    action = parts[2]  # 'attach' or 'detach'
+    
+    if action == "attach" and parts[3] == "all":
+        curr_inbound_id = int(parts[4])
+        uuid_val = parts[5]
+        target_ib_id = None
+    else:
+        curr_inbound_id = int(parts[3])
+        target_ib_id = int(parts[4])
+        uuid_val = parts[5]
+
+    client_api = ThreeXUIClient.from_storage()
+    if not client_api:
+        await callback.answer("Ошибка авторизации", show_alert=True)
+        return
+
+    inbounds_res = await client_api.get_inbounds()
+    inbounds = inbounds_res.get("obj", []) if inbounds_res.get("success") else []
+    
+    target_client = None
+    for ib in inbounds:
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        for c in clients:
+            if c.get("id") == uuid_val or c.get("password") == uuid_val:
+                target_client = c
+                break
+        if target_client:
+            break
+
+    if not target_client:
+        await callback.answer("Клиент не найден!", show_alert=True)
+        await client_api.close()
+        return
+
+    email = target_client.get("email")
+
+    if action == "attach" and target_ib_id is not None:
+        await callback.answer("Привязка инбаунда...")
+        attach_res = await client_api.attach_client_to_inbounds(email, [target_ib_id])
+        if not attach_res.get("success"):
+            total_bytes = target_client.get("totalGB", 0)
+            total_gb = total_bytes / (1024**3) if total_bytes > 0 else 0
+            limit_ip = target_client.get("limitIp", 0)
+            enable = target_client.get("enable", True)
+            flow = target_client.get("flow", "xtls-rprx-vision")
+            await client_api.add_client(
+                inbound_id=target_ib_id,
+                email=email,
+                uuid_str=uuid_val,
+                total_gb=total_gb,
+                limit_ip=limit_ip,
+                flow=flow,
+                enable=enable
+            )
+    elif action == "detach" and target_ib_id is not None:
+        await callback.answer("Отвязка инбаунда...")
+        detach_res = await client_api.detach_client_from_inbounds(email, [target_ib_id])
+        if not detach_res.get("success"):
+            await client_api.delete_client(target_ib_id, uuid_val, email=email)
+    elif action == "attach" and target_ib_id is None: # attach_all
+        await callback.answer("Привязка ко всем инбаундам...")
+        all_ids = [ib.get("id") for ib in inbounds]
+        await client_api.attach_client_to_inbounds(email, all_ids)
+
+    updated_res = await client_api.get_inbounds()
+    await client_api.close()
+
+    updated_inbounds = updated_res.get("obj", []) if updated_res.get("success") else []
+    attached_ids = []
+    for ib in updated_inbounds:
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        for c in clients:
+            if c.get("id") == uuid_val or c.get("password") == uuid_val:
+                attached_ids.append(ib.get("id"))
+
+    text = (
+        f"🌐 **Привязка клиента к инбаундам** (`{email}`)\n\n"
+        f"Нажмите на инбаунд для включения/отключения привязки:\n"
+        f"• ✅ — Клиент подключен\n"
+        f"• ❌ — Клиент не подключен"
+    )
+
+    from aiogram.exceptions import TelegramBadRequest
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.manage_client_inbounds_kb(curr_inbound_id, uuid_val, email, updated_inbounds, attached_ids),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            raise e
