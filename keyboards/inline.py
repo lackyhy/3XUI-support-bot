@@ -143,12 +143,15 @@ def bot_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
     ])
 
 def server_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
+    btn_bot_menu = "⚙️ Bot Menu (/menu)" if cur_lang == "en" else "⚙️ Настройки доступа (/menu)"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text=t("btn_refresh", lang), callback_data="menu_server"),
-            InlineKeyboardButton(text=t("btn_restart_xray", lang), callback_data="action_restart_xray")
+            InlineKeyboardButton(text=t("btn_refresh", cur_lang), callback_data="menu_server"),
+            InlineKeyboardButton(text=t("btn_restart_xray", cur_lang), callback_data="action_restart_xray")
         ],
-        [InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")]
+        [InlineKeyboardButton(text=btn_bot_menu, callback_data="menu_bot_dashboard")],
+        [InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")]
     ])
 
 def all_panels_status_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:

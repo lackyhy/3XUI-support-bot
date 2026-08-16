@@ -192,7 +192,7 @@ async def cb_server_status(callback: CallbackQuery):
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.server_menu_kb(panel_id=panel_id, is_enabled=is_enabled, lang=lang),
+            reply_markup=keyboards.server_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
