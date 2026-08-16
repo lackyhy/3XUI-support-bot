@@ -122,6 +122,14 @@ def server_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")]
     ])
 
+def all_panels_status_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=t("btn_refresh", lang), callback_data="menu_all_panels_status"),
+            InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")
+        ]
+    ])
+
 def inbounds_list_kb(inbounds: List[Dict[str, Any]], lang: Optional[str] = None) -> InlineKeyboardMarkup:
     buttons = []
     for ib in inbounds:

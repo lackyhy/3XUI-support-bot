@@ -328,10 +328,7 @@ async def cb_all_panels_status(event):
         return
 
     if isinstance(event, CallbackQuery):
-        await event.answer("Fetching status of all panels..." if lang == "en" else "Загрузка статуса всех панелей...")
-        status_msg = await event.message.answer("🔄 **Scanning all servers system metrics...**" if lang == "en" else "🔄 **Сканирование метрик систем всех серверов...**", parse_mode="Markdown")
-    else:
-        status_msg = await event.answer("🔄 **Scanning all servers system metrics...**" if lang == "en" else "🔄 **Сканирование метрик систем всех серверов...**", parse_mode="Markdown")
+        await event.answer("Updating status of all panels..." if lang == "en" else "Обновление статуса всех панелей...")
 
     total = len(panels)
     tasks = [fetch_single_panel_status_card(p, idx, total, lang) for idx, p in enumerate(panels, 1)]
@@ -353,9 +350,35 @@ async def cb_all_panels_status(event):
     if current_chunk:
         chunk_list.append(current_chunk.rstrip("\n\n---\n\n"))
 
-    await status_msg.delete()
+    if isinstance(event, CallbackQuery):
+        try:
+            await event.message.edit_text(
+                chunk_list[0],
+                reply_markup=keyboards.all_panels_status_kb(lang=lang),
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                pass
+            elif "message to edit not found" in str(e) or "message can't be edited" in str(e):
+                await event.message.answer(
+                    chunk_list[0],
+                    reply_markup=keyboards.all_panels_status_kb(lang=lang),
+                    parse_mode="Markdown"
+                )
+            else:
+                raise e
 
-    target_msg = event.message if isinstance(event, CallbackQuery) else event
-    for idx, chunk in enumerate(chunk_list):
-        markup = keyboards.bot_menu_kb(lang=lang) if idx == len(chunk_list) - 1 else None
-        await target_msg.answer(chunk, reply_markup=markup, parse_mode="Markdown")
+        for chunk in chunk_list[1:]:
+            await event.message.answer(
+                chunk,
+                reply_markup=keyboards.all_panels_status_kb(lang=lang),
+                parse_mode="Markdown"
+            )
+    else:
+        for chunk in chunk_list:
+            await event.answer(
+                chunk,
+                reply_markup=keyboards.all_panels_status_kb(lang=lang),
+                parse_mode="Markdown"
+            )
