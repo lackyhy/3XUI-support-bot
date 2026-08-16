@@ -85,13 +85,34 @@ def auth_type_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
     ])
 
-def settings_menu_kb() -> InlineKeyboardMarkup:
+def settings_menu_kb(lang: str = "en") -> InlineKeyboardMarkup:
+    btn_bot_menu = "⚙️ Bot Settings & Dashboard (/menu)" if lang == "en" else "⚙️ Настройки бота и Дашборд (/menu)"
+    btn_rename = "✏️ Rename Current Server" if lang == "en" else "✏️ Переименовать текущий сервер"
+    btn_setup = "✏️ Edit Server Connection Params" if lang == "en" else "✏️ Изменить параметры подключения"
+    btn_del = "🗑 Reset All Encrypted Data" if lang == "en" else "🗑 Сбросить зашифрованные данные"
+    btn_main = "🔙 Main Menu" if lang == "en" else "🔙 Главное меню"
+
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📦 Скачать бэкап базы (credentials.enc)", callback_data="export_credentials")],
-        [InlineKeyboardButton(text="✏️ Переименовать текущий сервер", callback_data="rename_panel")],
-        [InlineKeyboardButton(text="✏️ Изменить параметры подключения", callback_data="setup_panel")],
-        [InlineKeyboardButton(text="🗑 Сбросить зашифрованные данные", callback_data="delete_credentials")],
-        [InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu_main")]
+        [InlineKeyboardButton(text=btn_bot_menu, callback_data="menu_bot_dashboard")],
+        [InlineKeyboardButton(text=btn_rename, callback_data="rename_panel")],
+        [InlineKeyboardButton(text=btn_setup, callback_data="setup_panel")],
+        [InlineKeyboardButton(text=btn_del, callback_data="delete_credentials")],
+        [InlineKeyboardButton(text=btn_main, callback_data="menu_main")]
+    ])
+
+def bot_menu_kb(lang: str = "en") -> InlineKeyboardMarkup:
+    btn_export = "📦 Export Backup (credentials.enc)" if lang == "en" else "📦 Экспорт бэкапа (credentials.enc)"
+    btn_lang = "🇷🇺 Switch to Russian" if lang == "en" else "🇬🇧 Switch to English"
+    btn_server = "🖥 Change Active Server" if lang == "en" else "🖥 Сменить активный сервер"
+    btn_main = "🔙 Main Menu" if lang == "en" else "🔙 Главное меню"
+
+    target_lang = "ru" if lang == "en" else "en"
+
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=btn_export, callback_data="export_credentials")],
+        [InlineKeyboardButton(text=btn_lang, callback_data=f"set_lang_{target_lang}")],
+        [InlineKeyboardButton(text=btn_server, callback_data="menu_select_panel")],
+        [InlineKeyboardButton(text=btn_main, callback_data="menu_main")]
     ])
 
 def server_menu_kb() -> InlineKeyboardMarkup:

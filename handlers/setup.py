@@ -385,3 +385,135 @@ async def process_export_credentials(event):
         await event.message.answer_document(doc, caption=caption, parse_mode="Markdown")
     else:
         await event.answer_document(doc, caption=caption, parse_mode="Markdown")
+
+# BOT MENU & MULTI-PANEL DASHBOARD (/menu)
+import asyncio
+from core import bot_settings
+from core.i18n import t
+from aiogram.exceptions import TelegramBadRequest
+
+async def render_bot_menu_dashboard() -> Tuple[str, str]:
+    lang = bot_settings.get_language()
+    panels = crypto_storage.get_all_panels()
+    active_panel = crypto_storage.get_active_panel()
+    active_name = active_panel.get("name", "—") if active_panel else "—"
+
+    import config
+    bot_proxy_str = config.BOT_PROXY or ("None" if lang == "en" else "Отсутствует")
+
+    total_count = len(panels)
+    online_count = 0
+    offline_count = 0
+    panel_status_lines = []
+
+    if total_count == 0:
+        panel_status_lines.append("• *No panels registered yet.*" if lang == "en" else "• *Панели ещё не подключены.*")
+    else:
+        async def check_panel(p):
+            p_id = p.get("id")
+            p_name = p.get("name", "Server")
+            client = ThreeXUIClient.from_storage(p_id)
+            if not client:
+                return (p_name, False, "Auth failed")
+            try:
+                res = await asyncio.wait_for(client.get_inbounds(), timeout=4.0)
+                await client.close()
+                if res.get("success"):
+                    inbounds_cnt = len(res.get("obj", []))
+                    return (p_name, True, f"{inbounds_cnt} inbounds")
+                else:
+                    return (p_name, False, res.get("msg", "Error"))
+            except Exception:
+                try:
+                    await client.close()
+                except Exception:
+                    pass
+                return (p_name, False, "Connection Timeout")
+
+        tasks = [check_panel(p) for p in panels]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for res in results:
+            if isinstance(res, tuple):
+                name, is_online, detail = res
+                if is_online:
+                    online_count += 1
+                    panel_status_lines.append(f"• 🟢 **{name}** — `{detail}`")
+                else:
+                    offline_count += 1
+                    panel_status_lines.append(f"• 🔴 **{name}** — `{detail}`")
+
+    lang_display = "English 🇬🇧" if lang == "en" else "Русский 🇷🇺"
+    status_summary = f"🟢 Online: `{online_count}` | 🔴 Offline: `{offline_count}`" if total_count > 0 else "—"
+
+    if lang == "en":
+        text = (
+            f"🤖 **Bot Settings & Multi-Panel Dashboard**\n\n"
+            f"🖥 **Total Panels:** `{total_count}`\n"
+            f"📊 **Panels Health:** {status_summary}\n"
+            f"🟢 **Active Server:** `{active_name}`\n"
+            f"🌐 **Bot Proxy:** `{bot_proxy_str}`\n"
+            f"🗣 **Interface Language:** `{lang_display}`\n\n"
+            f"📋 **Registered Panels Status:**\n"
+            + "\n".join(panel_status_lines) + "\n\n"
+            "Choose an option below to manage bot configuration:"
+        )
+    else:
+        text = (
+            f"🤖 **Настройки бота и Мониторинг панелей**\n\n"
+            f"🖥 **Всего панелей:** `{total_count}`\n"
+            f"📊 **Статус панелей:** {status_summary}\n"
+            f"🟢 **Активный сервер:** `{active_name}`\n"
+            f"🌐 **Прокси бота:** `{bot_proxy_str}`\n"
+            f"🗣 **Язык интерфейса:** `{lang_display}`\n\n"
+            f"📋 **Состояние подключенных панелей:**\n"
+            + "\n".join(panel_status_lines) + "\n\n"
+            "Выберите команду ниже для управления настройками:"
+        )
+
+    return text, lang
+
+@router.message(Command("menu"))
+@router.callback_query(F.data == "menu_bot_dashboard")
+async def cb_bot_menu_dashboard(event):
+    if isinstance(event, CallbackQuery):
+        await event.answer("Loading dashboard...")
+        text, lang = await render_bot_menu_dashboard()
+        try:
+            await event.message.edit_text(
+                text,
+                reply_markup=keyboards.bot_menu_kb(lang),
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                pass
+            else:
+                raise e
+    else:
+        msg = await event.answer("🔄 Scanning panels status...")
+        text, lang = await render_bot_menu_dashboard()
+        await msg.edit_text(
+            text,
+            reply_markup=keyboards.bot_menu_kb(lang),
+            parse_mode="Markdown"
+        )
+
+@router.callback_query(F.data.startswith("set_lang_"))
+async def cb_set_language(callback: CallbackQuery):
+    target_lang = callback.data.split("_")[2]
+    bot_settings.set_language(target_lang)
+    alert_txt = t(f"lang_switched_{target_lang}", target_lang)
+    await callback.answer(alert_txt, show_alert=True)
+    text, lang = await render_bot_menu_dashboard()
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.bot_menu_kb(lang),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            raise e
