@@ -14,27 +14,32 @@ from states.states import AddClientStates, SearchClientStates, EditClientGBState
 
 router = Router()
 
-def format_timestamp(ms: int) -> str:
+from core import bot_settings
+from core.i18n import t
+
+def format_timestamp(ms: int, lang: str = "en") -> str:
     if not ms or ms <= 0:
-        return "♾ Безлимитно"
+        return t("unlimited", lang)
     dt = datetime.datetime.fromtimestamp(ms / 1000.0)
     return dt.strftime("%d.%m.%Y %H:%M")
 
 @router.callback_query(F.data == "menu_clients_hub")
 async def cb_clients_hub(callback: CallbackQuery):
     client_api = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
     if not client_api:
-        await callback.answer("Ошибка авторизации", show_alert=True)
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer("Загрузка раздела клиентов...")
+    await callback.answer("Loading clients hub..." if lang == "en" else "Загрузка раздела клиентов...")
     res = await client_api.get_inbounds()
     await client_api.close()
 
     if not res.get("success"):
         await callback.message.edit_text(
-            f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.main_menu_kb(),
+            f"❌ **Error loading data:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
+            reply_markup=keyboards.main_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -54,8 +59,8 @@ async def cb_clients_hub(callback: CallbackQuery):
     total_clients = len(unique_clients)
     if total_clients == 0:
         await callback.message.edit_text(
-            "👥 **Раздел клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
-            reply_markup=keyboards.main_menu_kb(),
+            "👥 **Client Management Hub**\n\nNo clients found in any inbound." if lang == "en" else "👥 **Раздел клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
+            reply_markup=keyboards.main_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -68,14 +73,14 @@ async def cb_clients_hub(callback: CallbackQuery):
     groups_summary = [(grp, count) for grp, count in group_counts.items()]
 
     text = (
-        f"👥 **Раздел клиентов**\n\n"
-        f"Всего клиентов в системе: **{total_clients}**\n\n"
-        f"Выберите **Все клиенты** или просмотрите список по конкретным группам:"
+        f"{t('clients_hub_title', lang)}\n\n"
+        f"{t('total_clients_in_system', lang, count=total_clients)}\n\n"
+        f"{t('select_all_or_group', lang)}"
     )
 
     await callback.message.edit_text(
         text,
-        reply_markup=keyboards.clients_hub_kb(groups_summary, total_clients),
+        reply_markup=keyboards.clients_hub_kb(groups_summary, total_clients, lang=lang),
         parse_mode="Markdown"
     )
 
@@ -86,18 +91,20 @@ async def cb_group_clients(callback: CallbackQuery):
     page = int(parts[4])
 
     client_api = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
     if not client_api:
-        await callback.answer("Ошибка авторизации", show_alert=True)
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer("Загрузка клиентов группы...")
+    await callback.answer("Loading group clients..." if lang == "en" else "Загрузка клиентов группы...")
     res = await client_api.get_inbounds()
     await client_api.close()
 
     if not res.get("success"):
         await callback.message.edit_text(
-            f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.main_menu_kb(),
+            f"❌ **Error loading data:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
+            reply_markup=keyboards.main_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -138,18 +145,21 @@ async def cb_group_clients(callback: CallbackQuery):
         info["inbounds_summary"] = summary
         items.append(info)
 
-    disp_group_title = f"Группа `{group_filter}`" if group_filter != "none" else "Без группы"
+    if group_filter == "none":
+        grp_name = "Without Group" if lang == "en" else "Без группы"
+    else:
+        grp_name = f"Group `{group_filter}`" if lang == "en" else f"Группа `{group_filter}`"
+
     text = (
-        f"📁 **Клиенты — {disp_group_title}**\n\n"
-        f"Пользователей в группе: **{len(items)}**\n"
-        "Выберите клиента для управления:"
+        f"📁 **{t('btn_clients', lang)} — {grp_name}**\n\n"
+        f"Users in group: **{len(items)}**\nSelect a client to manage:" if lang == "en" else f"📁 **Клиенты — {grp_name}**\n\nПользователей в группе: **{len(items)}**\nВыберите клиента для управления:"
     )
 
     from aiogram.exceptions import TelegramBadRequest
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.all_clients_paginated_kb(items, page, group_filter=group_filter),
+            reply_markup=keyboards.all_clients_paginated_kb(items, page, group_filter=group_filter, lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
@@ -163,18 +173,20 @@ async def cb_all_clients(callback: CallbackQuery):
     page = int(callback.data.split("_")[3])
 
     client_api = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
     if not client_api:
-        await callback.answer("Ошибка авторизации", show_alert=True)
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer("Загрузка списка всех клиентов...")
+    await callback.answer("Loading all clients..." if lang == "en" else "Загрузка списка всех клиентов...")
     res = await client_api.get_inbounds()
     await client_api.close()
 
     if not res.get("success"):
         await callback.message.edit_text(
-            f"❌ **Ошибка загрузки инбаундов:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.main_menu_kb(),
+            f"❌ **Error loading inbounds:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки инбаундов:**\n`{res.get('msg')}`",
+            reply_markup=keyboards.main_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -205,8 +217,8 @@ async def cb_all_clients(callback: CallbackQuery):
 
     if not unique_clients:
         await callback.message.edit_text(
-            "👥 **Список всех клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
-            reply_markup=keyboards.main_menu_kb(),
+            "👥 **All Clients List**\n\nNo clients found." if lang == "en" else "👥 **Список всех клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
+            reply_markup=keyboards.main_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -224,16 +236,16 @@ async def cb_all_clients(callback: CallbackQuery):
     active_count = sum(1 for item in items if item.get("enable", True))
 
     text = (
-        f"🌐 **Все клиенты панели 3x-ui**\n\n"
-        f"Уникальных пользователей: **{len(items)}** (Активных: **{active_count}**)\n"
-        "Выберите клиента для управления:"
+        f"🌐 **{t('clients_list_title', lang, filter_name='All')}**\n\n"
+        f"{t('unique_users', lang, total=len(items), active=active_count)}\n"
+        f"{t('select_client_to_manage', lang)}"
     )
 
     from aiogram.exceptions import TelegramBadRequest
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.all_clients_paginated_kb(items, page),
+            reply_markup=keyboards.all_clients_paginated_kb(items, page, lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
@@ -250,16 +262,18 @@ async def cb_view_client(callback: CallbackQuery):
     group_filter = parts[4] if len(parts) > 4 else "all"
 
     client_api = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
     if not client_api:
-        await callback.answer(" Ошибка авторизации", show_alert=True)
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer("Загрузка профиля...")
+    await callback.answer("Loading profile..." if lang == "en" else "Загрузка профиля...")
     res = await client_api.get_inbounds()
     await client_api.close()
 
     if not res.get("success"):
-        await callback.message.edit_text("❌ Ошибка загрузки инбаундов.", reply_markup=keyboards.main_menu_kb())
+        await callback.message.edit_text("❌ Error loading inbounds." if lang == "en" else "❌ Ошибка загрузки инбаундов.", reply_markup=keyboards.main_menu_kb(lang=lang))
         return
 
     inbounds = res.get("obj", [])
@@ -281,12 +295,12 @@ async def cb_view_client(callback: CallbackQuery):
                     target_client = c
 
     if not target_client:
-        await callback.message.edit_text("❌ Клиент не найден.", reply_markup=keyboards.inbound_detail_kb(inbound_id))
+        await callback.message.edit_text("❌ Client not found." if lang == "en" else "❌ Клиент не найден.", reply_markup=keyboards.inbound_detail_kb(inbound_id, lang=lang))
         return
 
     email = target_client.get("email", "no-name")
     is_enabled = target_client.get("enable", True)
-    status_str = "🟢 Активен" if is_enabled else "🔴 Отключен"
+    status_str = t("status_active", lang) if is_enabled else t("status_disabled", lang)
     group_name = target_client.get("group") if target_client.get("group") else "—"
 
     # Search client traffic across inbounds using max to avoid multi-inbound duplication
@@ -300,16 +314,19 @@ async def cb_view_client(callback: CallbackQuery):
                 used_down = max(used_down, stat.get("down", 0))
 
     used_total = used_up + used_down
-    traffic_str = f"📊 **Использовано:** `{format_bytes(used_total)}` (⬆️ {format_bytes(used_up)} | ⬇️ {format_bytes(used_down)})"
+    lbl_used = t("used_traffic", lang)
+    traffic_str = f"{lbl_used} `{format_bytes(used_total)}` (⬆️ {format_bytes(used_up)} | ⬇️ {format_bytes(used_down)})"
 
     total_gb_limit = target_client.get("totalGB", 0)
-    limit_str = format_bytes(total_gb_limit) if total_gb_limit > 0 else "♾ Безлимитно"
-    expiry_str = format_timestamp(target_client.get("expiryTime", 0))
+    limit_str = format_bytes(total_gb_limit) if total_gb_limit > 0 else t("unlimited", lang)
+    expiry_str = format_timestamp(target_client.get("expiryTime", 0), lang=lang)
     limit_ip = target_client.get("limitIp", 0)
-    limit_ip_str = f"{limit_ip} устройства" if limit_ip > 0 else "♾ Без ограничений"
+    dev_word = "devices" if lang == "en" else "устройства"
+    limit_ip_str = f"{limit_ip} {dev_word}" if limit_ip > 0 else t("no_limit", lang)
 
     attached_count = len(attached_inbounds)
-    attached_text = "\n".join(attached_inbounds) if attached_inbounds else "• *Не привязан ни к одному инбаунду*"
+    not_bound_msg = "• *Not attached to any inbound*" if lang == "en" else "• *Не привязан ни к одному инбаунду*"
+    attached_text = "\n".join(attached_inbounds) if attached_inbounds else not_bound_msg
 
     import urllib.parse
     active_panel = crypto_storage.get_active_panel()
@@ -318,21 +335,30 @@ async def cb_view_client(callback: CallbackQuery):
 
     sub_url = client_api.generate_subscription_link(target_client, parsed_host, sub_port=sub_port)
 
+    lbl_prof = t("client_profile_title", lang, email=email)
+    lbl_uuid = t("client_uuid", lang)
+    lbl_group = t("client_group", lang)
+    lbl_status = t("client_status", lang)
+    lbl_attached = t("attached_inbounds", lang, count=attached_count)
+    lbl_sub = t("sub_link", lang)
+    lbl_limit = t("traffic_limit", lang)
+    lbl_exp = t("expires_at", lang)
+    lbl_ip = t("ip_limit", lang)
+
     text = (
-        f"👤 **Профиль клиента: {email}**\n\n"
-        f"🆔 **UUID / Pass:** `{uuid_val}`\n"
-        f"👥 **Группа:** `{group_name}`\n"
-        f"Статус: **{status_str}**\n\n"
-        f"🌐 **Привязан к инбаундам ({attached_count}):**\n"
+        f"{lbl_prof}\n\n"
+        f"{lbl_uuid} `{uuid_val}`\n"
+        f"{lbl_group} `{group_name}`\n"
+        f"{lbl_status} **{status_str}**\n\n"
+        f"{lbl_attached}\n"
         f"{attached_text}\n\n"
-        f"🌐 **Ссылка подписки:** `{sub_url}`\n\n"
+        f"{lbl_sub} `{sub_url}`\n\n"
         f"{traffic_str}\n"
-        f"📈 **Лимит трафика:** `{limit_str}`\n"
-        f"📅 **Истекает:** `{expiry_str}`\n"
-        f"📱 **Лимит IP:** `{limit_ip_str}`\n"
+        f"{lbl_limit} `{limit_str}`\n"
+        f"{lbl_exp} `{expiry_str}`\n"
+        f"{lbl_ip} `{limit_ip_str}`\n"
     )
 
-    # If returning from photo message, delete photo first
     if callback.message.photo:
         await callback.message.delete()
         await callback.message.answer(

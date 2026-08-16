@@ -5,23 +5,25 @@ from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 
 from core.api_client import ThreeXUIClient, format_bytes
+from core import bot_settings
+from core.i18n import t
 from keyboards import inline as keyboards
 
 router = Router()
 
-def format_uptime_days(seconds: int) -> str:
+def format_uptime_days(seconds: int, lang: str = "en") -> str:
     if not seconds:
-        return "0 Мин"
+        return f"0 {t('min', lang)}"
     days = seconds // 86400
     hours = (seconds % 86400) // 3600
     minutes = (seconds % 3600) // 60
     parts = []
     if days > 0:
-        parts.append(f"{days} Дней")
+        parts.append(f"{days} {t('days', lang)}")
     if hours > 0:
-        parts.append(f"{hours} Часов")
+        parts.append(f"{hours} {t('hours', lang)}")
     if not parts or minutes > 0:
-        parts.append(f"{minutes} Мин")
+        parts.append(f"{minutes} {t('min', lang)}")
     return " ".join(parts)
 
 def resolve_hostname(obj: dict, host_url: str) -> str:
@@ -66,22 +68,24 @@ def resolve_xui_version(obj: dict) -> str:
 @router.callback_query(F.data == "menu_server")
 async def cb_server_status(callback: CallbackQuery):
     client = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
     if not client:
         await callback.message.edit_text(
-            "❌ Данные панели не найдены. Подключите панель заново.",
-            reply_markup=keyboards.main_menu_kb(has_creds=False)
+            "❌ Panel credentials not found." if lang == "en" else "❌ Данные панели не найдены.",
+            reply_markup=keyboards.main_menu_kb(has_creds=False, lang=lang)
         )
         await callback.answer()
         return
 
-    await callback.answer("Загрузка статуса сервера...")
+    await callback.answer("Loading server status..." if lang == "en" else "Загрузка статуса сервера...")
     res = await client.get_server_status()
 
     if not res.get("success"):
         await client.close()
         await callback.message.edit_text(
-            f"❌ **Ошибка получения статуса сервера:**\n`{res.get('msg', 'Неизвестная ошибка')}`",
-            reply_markup=keyboards.server_menu_kb(),
+            f"❌ **Error getting server status:**\n`{res.get('msg', 'Unknown Error')}`" if lang == "en" else f"❌ **Ошибка получения статуса сервера:**\n`{res.get('msg', 'Неизвестная ошибка')}`",
+            reply_markup=keyboards.server_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -106,7 +110,7 @@ async def cb_server_status(callback: CallbackQuery):
 
     # Uptime & Load
     uptime_sec = obj.get("uptime", 0)
-    uptime_str = format_uptime_days(uptime_sec)
+    uptime_str = format_uptime_days(uptime_sec, lang=lang)
     
     loads = obj.get("loads") or [0.0, 0.0, 0.0]
     if isinstance(loads, list) and len(loads) >= 3:
@@ -152,26 +156,26 @@ async def cb_server_status(callback: CallbackQuery):
     await client.close()
 
     text = (
-        f"💻 **Имя хоста:** `{hostname}`\n"
-        f"🚀 **Версия X-UI:** `{xui_version}`\n"
-        f"📡 **Версия Xray:** `{xray_version}`\n"
+        f"{t('hostname', lang)} `{hostname}`\n"
+        f"{t('xui_ver', lang)} `{xui_version}`\n"
+        f"{t('xray_ver', lang)} `{xray_version}`\n"
         f"🌐 **IPv4:** `{ipv4}`\n"
         f"🌐 **IPv6:** `{ipv6}`\n"
-        f"⏳ **Время работы сервера:** `{uptime_str}`\n"
-        f"📈 **Нагрузка сервера:** `{load_str}`\n"
-        f"📋 **ОЗУ сервера:** `{ram_str}`\n"
-        f"💾 **Диск сервера:** `{disk_str}`\n"
-        f"🌐 **Клиентов онлайн:** `{online_count}`\n"
-        f"🔹 **Количество TCP-соединений:** `{tcp_count}`\n"
-        f"🔸 **Количество UDP-соединений:** `{udp_count}`\n"
-        f"🚦 **Трафик:** `{traffic_str}`\n"
-        f"ℹ️ **Состояние Xray:** `{xray_state}`"
+        f"{t('server_uptime', lang)} `{uptime_str}`\n"
+        f"{t('server_load', lang)} `{load_str}`\n"
+        f"{t('server_ram', lang)} `{ram_str}`\n"
+        f"{t('server_disk', lang)} `{disk_str}`\n"
+        f"{t('online_clients', lang)} `{online_count}`\n"
+        f"{t('tcp_conn', lang)} `{tcp_count}`\n"
+        f"{t('udp_conn', lang)} `{udp_count}`\n"
+        f"{t('server_traffic', lang)} `{traffic_str}`\n"
+        f"{t('xray_status', lang)} `{xray_state}`"
     )
 
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.server_menu_kb(),
+            reply_markup=keyboards.server_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
@@ -183,18 +187,20 @@ async def cb_server_status(callback: CallbackQuery):
 @router.callback_query(F.data == "action_restart_xray")
 async def cb_restart_xray(callback: CallbackQuery):
     client = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
     if not client:
-        await callback.answer("Ошибка: Настройки не найдены!", show_alert=True)
+        await callback.answer("Error: Credentials missing!" if lang == "en" else "Ошибка: Настройки не найдены!", show_alert=True)
         return
 
-    await callback.answer("Перезапуск Xray...")
+    await callback.answer("Restarting Xray..." if lang == "en" else "Перезапуск Xray...")
     res = await client.restart_xray()
     await client.close()
 
     if res.get("success"):
-        await callback.message.answer("⚡ **Xray Core успешно перезапущен!**", parse_mode="Markdown")
+        await callback.message.answer("⚡ **Xray Core restarted successfully!**" if lang == "en" else "⚡ **Xray Core успешно перезапущен!**", parse_mode="Markdown")
     else:
         await callback.message.answer(
-            f"❌ **Ошибка при перезапуск Xray:**\n`{res.get('msg')}`",
+            f"❌ **Error restarting Xray:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка при перезапуске Xray:**\n`{res.get('msg')}`",
             parse_mode="Markdown"
         )

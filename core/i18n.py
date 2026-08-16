@@ -20,6 +20,14 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "btn_cancel": "❌ Cancel",
         "btn_refresh": "🔄 Refresh",
 
+        # Panels List & Switching
+        "panels_list_title": "🖥 **Connected 3x-ui Servers List**",
+        "select_server_to_switch": "Select a server to switch control:",
+        "btn_add_server": "➕ Add Server",
+        "btn_delete_server": "🗑 Delete Server",
+        "btn_back_to_servers": "🔙 To Servers List",
+        "active_suffix": " (Active)",
+
         # Server Status
         "server_status_title": "📊 **Server Status & System Metrics**",
         "hostname": "💻 Hostname:",
@@ -34,14 +42,21 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "udp_conn": "🔸 UDP Connections:",
         "server_traffic": "🚦 Network Traffic:",
         "xray_status": "ℹ️ Xray Status:",
+        "days": "Days",
+        "hours": "Hours",
+        "min": "Min",
 
-        # Clients Hub
+        # Clients Hub & Lists
         "clients_hub_title": "👥 **Client Management Hub**",
+        "total_clients_in_system": "Total clients in system: **{count}**",
+        "select_all_or_group": "Select All Clients or view by specific group:",
         "all_clients_btn": "🌐 All Clients ({count})",
         "group_btn": "📁 Group: {name} ({count})",
         "no_group_btn": "📂 Without Group ({count})",
         "back_to_hub": "🔙 Back to Categories",
-        "clients_list_title": "👥 **Client List ({filter_name})**",
+        "clients_list_title": "👥 **3x-ui Clients List ({filter_name})**",
+        "unique_users": "Unique users: **{total}** (Active: **{active}**)",
+        "select_client_to_manage": "Select a client below to view and manage:",
         "page_info": "Page {current} of {total}",
 
         # Client Profile
@@ -59,17 +74,25 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "expires_at": "📅 Expires:",
         "ip_limit": "📱 IP Limit:",
         "no_limit": "♾ No limit",
-        "btn_toggle_client": "🟢/🔴 Toggle Status",
-        "btn_edit_client": "✏️ Edit Client",
+        "btn_qr_code": "🔑 Link & QR Code",
+        "btn_deactivate": "🔴 Deactivate",
+        "btn_activate": "🟢 Activate",
+        "btn_inbound_binding": "🌐 Inbounds Binding",
+        "btn_edit_limit_gb": "📈 Edit Traffic Limit (GB)",
+        "btn_edit_expiry": "📅 Edit Expiry Date",
         "btn_reset_traffic": "🔄 Reset Traffic",
+        "btn_reset_ip": "🧹 Reset IP Limit",
         "btn_delete_client": "🗑 Delete Client",
-        "btn_qr_code": "📱 QR Code",
         "btn_back_to_clients": "🔙 Back to Client List",
+        "btn_next": "Next ▶️",
+        "btn_prev": "◀️ Back",
 
         # Inbounds
         "inbounds_list_title": "🌐 **Inbound Connections List**",
-        "total_inbounds": "Total connections: **{count}**",
+        "total_inbounds_count": "Total connections: **{count}**",
+        "select_inbound_to_manage": "Select a connection below to manage clients:",
         "inbound_card_title": "🌐 **Inbound: {remark}**",
+        "server_label": "🖥 **Server:**",
         "node_listen": "🌐 **Node (Listen):**",
         "proto_port": "🛠 **Protocol:**",
         "net_sec": "🌐 **Network / Security:**",
@@ -80,8 +103,10 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "sniffing_info": "🔍 **Sniffing:**",
         "sniff_protocols": "• **Protocols:**",
         "btn_view_inbound_clients": "👥 Inbound Clients",
+        "btn_add_client_to_inbound": "➕ Add Client",
+        "btn_back_to_inbounds": "🔙 To Inbounds",
 
-        # Bot Dashboard
+        # Bot Dashboard & Settings
         "menu_title": "🤖 **Bot Settings & Multi-Panel Dashboard**",
         "total_panels": "🖥 **Total Panels:**",
         "panels_status": "📊 **Panels Health:**",
@@ -95,6 +120,10 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "lang_switched_en": "✅ Interface language changed to **English**! 🇬🇧",
         "lang_switched_ru": "✅ Язык интерфейса изменен на **Русский**! 🇷🇺",
         "btn_bot_menu": "⚙️ Bot Settings & Dashboard (/menu)",
+        "settings_title": "⚙️ **Active Server Settings**",
+        "btn_rename_panel": "✏️ Rename Current Server",
+        "btn_edit_setup": "✏️ Edit Server Connection Params",
+        "btn_reset_credentials": "🗑 Reset All Encrypted Data",
     },
     "ru": {
         # Главное меню
@@ -114,6 +143,14 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "btn_cancel": "❌ Отмена",
         "btn_refresh": "🔄 Обновить",
 
+        # Список серверов
+        "panels_list_title": "🖥 **Список подключенных серверов 3x-ui**",
+        "select_server_to_switch": "Выберите сервер для переключения управления:",
+        "btn_add_server": "➕ Добавить сервер",
+        "btn_delete_server": "🗑 Удалить сервер",
+        "btn_back_to_servers": "🔙 К списку серверов",
+        "active_suffix": " (Активен)",
+
         # Статус сервера
         "server_status_title": "📊 **Статус сервера и системы**",
         "hostname": "💻 Имя хоста:",
@@ -128,14 +165,21 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "udp_conn": "🔸 UDP-соединения:",
         "server_traffic": "🚦 Сетевой трафик:",
         "xray_status": "ℹ️ Состояние Xray:",
+        "days": "Дней",
+        "hours": "Часов",
+        "min": "Мин",
 
         # Клиенты Hub
-        "clients_hub_title": "👥 **Центр управления клиентами**",
+        "clients_hub_title": "👥 **Раздел клиентов**",
+        "total_clients_in_system": "Всего клиентов в системе: **{count}**",
+        "select_all_or_group": "Выберите Все клиенты или просмотрите список по конкретным группам:",
         "all_clients_btn": "🌐 Все клиенты ({count})",
         "group_btn": "📁 Группа: {name} ({count})",
         "no_group_btn": "📂 Без группы ({count})",
-        "back_to_hub": "🔙 К категориям",
-        "clients_list_title": "👥 **Список клиентов ({filter_name})**",
+        "back_to_hub": "🔙 К разделу клиентов",
+        "clients_list_title": "👥 **Все клиенты панели 3x-ui ({filter_name})**",
+        "unique_users": "Уникальных пользователей: **{total}** (Активных: **{active}**)",
+        "select_client_to_manage": "Выберите клиента для управления:",
         "page_info": "Страница {current} из {total}",
 
         # Профиль клиента
@@ -153,17 +197,25 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "expires_at": "📅 Истекает:",
         "ip_limit": "📱 Лимит IP:",
         "no_limit": "♾ Без ограничений",
-        "btn_toggle_client": "🟢/🔴 Вкл/Выкл",
-        "btn_edit_client": "✏️ Редактировать",
-        "btn_reset_traffic": "🔄 Сброс трафика",
+        "btn_qr_code": "🔑 Ссылка и QR-код",
+        "btn_deactivate": "🔴 Деактивировать",
+        "btn_activate": "🟢 Активировать",
+        "btn_inbound_binding": "🌐 Привязка к инбаундам",
+        "btn_edit_limit_gb": "📈 Изменить лимит ГБ",
+        "btn_edit_expiry": "📅 Изменить срок",
+        "btn_reset_traffic": "🔄 Сбросить трафик",
+        "btn_reset_ip": "🧹 Сбросить IP",
         "btn_delete_client": "🗑 Удалить клиента",
-        "btn_qr_code": "📱 QR-код",
         "btn_back_to_clients": "🔙 К списку клиентов",
+        "btn_next": "Вперед ▶️",
+        "btn_prev": "◀️ Назад",
 
         # Инбаунды
         "inbounds_list_title": "🌐 **Список подключений (Inbounds)**",
-        "total_inbounds": "Всего подключений: **{count}**",
+        "total_inbounds_count": "Всего подключений: **{count}**",
+        "select_inbound_to_manage": "Выберите нужное подключение для управления клиентами:",
         "inbound_card_title": "🌐 **Инбаунд: {remark}**",
+        "server_label": "🖥 **Сервер:**",
         "node_listen": "🌐 **Узел (Listen):**",
         "proto_port": "🛠 **Протокол:**",
         "net_sec": "🌐 **Сеть / Защита:**",
@@ -173,7 +225,9 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "sni_names": "🌐 **SNI (ServerNames):**",
         "sniffing_info": "🔍 **Сниффинг:**",
         "sniff_protocols": "• **Перехват:**",
-        "btn_view_inbound_clients": "👥 Клиенты инбаунда",
+        "btn_view_inbound_clients": "👥 Список клиентов",
+        "btn_add_client_to_inbound": "➕ Добавить клиента",
+        "btn_back_to_inbounds": "🔙 К инбаундам",
 
         # Дашборд бота
         "menu_title": "🤖 **Настройки бота и Мониторинг панелей**",
@@ -189,6 +243,10 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "lang_switched_en": "✅ Interface language changed to **English**! 🇬🇧",
         "lang_switched_ru": "✅ Язык интерфейса изменен на **Русский**! 🇷🇺",
         "btn_bot_menu": "⚙️ Настройки бота и Дашборд (/menu)",
+        "settings_title": "⚙️ **Настройки активного сервера**",
+        "btn_rename_panel": "✏️ Переименовать текущий сервер",
+        "btn_edit_setup": "✏️ Изменить параметры подключения",
+        "btn_reset_credentials": "🗑 Сбросить зашифрованные данные",
     }
 }
 
