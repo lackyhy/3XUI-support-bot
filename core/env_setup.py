@@ -14,6 +14,8 @@ def ensure_env_file() -> None:
     bot_token = ""
     admin_id = ""
     encryption_key = ""
+    bot_proxy = ""
+    panel_proxy = ""
 
     if env_file.exists():
         with open(env_file, "r", encoding="utf-8") as f:
@@ -25,6 +27,10 @@ def ensure_env_file() -> None:
                     admin_id = line.split("=", 1)[1].strip()
                 elif line.startswith("ENCRYPTION_KEY="):
                     encryption_key = line.split("=", 1)[1].strip()
+                elif line.startswith("BOT_PROXY="):
+                    bot_proxy = line.split("=", 1)[1].strip()
+                elif line.startswith("PANEL_PROXY="):
+                    panel_proxy = line.split("=", 1)[1].strip()
 
     if bot_token and admin_id and encryption_key:
         return
@@ -62,11 +68,27 @@ def ensure_env_file() -> None:
             encryption_key = base64.urlsafe_b64encode(key_bytes).decode('utf-8')
             print(f"✅ Секретная фраза обработана в Fernet AES-256 ключ.")
 
+    print("\n🌐 **Настройка Прокси (Необязательно)**")
+    print("Пример HTTP: http://1.2.3.4:8080 или http://user:pass@1.2.3.4:8080")
+    print("Пример SOCKS5: socks5://1.2.3.4:1080 или socks5://user:pass@1.2.3.4:1080")
+    print("Нажмите [ENTER], чтобы пропустить прокси.")
+
+    if not bot_proxy:
+        bot_proxy = input("👉 Прокси для Telegram бота (BOT_PROXY): ").strip()
+
+    if not panel_proxy:
+        panel_proxy = input("👉 Прокси для запросов к панелям 3x-ui (PANEL_PROXY): ").strip()
+
     env_content = (
         f"BOT_TOKEN={bot_token}\n"
         f"ADMIN_ID={admin_id}\n"
         f"ENCRYPTION_KEY={encryption_key}\n"
     )
+    if bot_proxy:
+        env_content += f"BOT_PROXY={bot_proxy}\n"
+    if panel_proxy:
+        env_content += f"PANEL_PROXY={panel_proxy}\n"
+
     with open(env_file, "w", encoding="utf-8") as f:
         f.write(env_content)
 

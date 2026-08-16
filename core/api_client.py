@@ -83,7 +83,8 @@ class ThreeXUIClient:
         password: Optional[str] = None,
         token: Optional[str] = None,
         auth_type: str = "credentials",
-        timeout: float = 15.0
+        timeout: float = 15.0,
+        proxy: Optional[str] = None
     ):
         self.host = host.rstrip('/')
         self.username = username
@@ -91,11 +92,22 @@ class ThreeXUIClient:
         self.token = token
         self.auth_type = auth_type
         self.timeout = timeout
-        self.client = httpx.AsyncClient(
-            verify=False,
-            timeout=httpx.Timeout(timeout),
-            follow_redirects=True
-        )
+
+        import config
+        proxy_url = proxy or config.PANEL_PROXY
+        if proxy_url:
+            self.client = httpx.AsyncClient(
+                verify=False,
+                timeout=httpx.Timeout(timeout),
+                follow_redirects=True,
+                proxy=proxy_url
+            )
+        else:
+            self.client = httpx.AsyncClient(
+                verify=False,
+                timeout=httpx.Timeout(timeout),
+                follow_redirects=True
+            )
         self._is_logged_in = True if self.token else False
 
     @classmethod

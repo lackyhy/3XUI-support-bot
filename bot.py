@@ -17,11 +17,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("3x-ui-bot")
 
+async def create_bot_instance() -> Bot:
+    if not config.BOT_PROXY:
+        return Bot(token=config.BOT_TOKEN)
+
+    logger.info(f"Connecting to Telegram via Proxy: {config.BOT_PROXY}")
+    proxy_url = config.BOT_PROXY
+    from aiogram.client.session.aiohttp import AiohttpSession
+
+    if proxy_url.startswith("socks"):
+        from aiohttp_socks import ProxyConnector
+        connector = ProxyConnector.from_url(proxy_url)
+        session = AiohttpSession(connector=connector)
+    else:
+        session = AiohttpSession(proxy=proxy_url)
+
+    return Bot(token=config.BOT_TOKEN, session=session)
+
 async def main():
     logger.info("Initializing 3x-ui Management Bot...")
     logger.info(f"Authorized Admin ID: {config.ADMIN_ID}")
+    if config.BOT_PROXY:
+        logger.info(f"Bot Proxy: {config.BOT_PROXY}")
+    if config.PANEL_PROXY:
+        logger.info(f"Panel Proxy: {config.PANEL_PROXY}")
     
-    bot = Bot(token=config.BOT_TOKEN)
+    bot = await create_bot_instance()
     dp = Dispatcher(storage=MemoryStorage())
 
     # Attach Authorization Middleware
