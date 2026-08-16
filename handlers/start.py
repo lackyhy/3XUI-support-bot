@@ -110,6 +110,24 @@ async def cb_switch_panel(callback: CallbackQuery):
     else:
         await callback.answer("Ошибка переключения сервера", show_alert=True)
 
+@router.callback_query(F.data == "menu_toggle_panels")
+async def cb_menu_toggle_panels(callback: CallbackQuery):
+    lang = bot_settings.get_language()
+    panels = crypto_storage.get_panels()
+
+    text = (
+        "👁 **Enable / Disable Servers in Statistics**\n\n"
+        "Click a server to toggle its visibility in global statistics:" if lang == "en" else "👁 **Включение / Отключение серверов в статистике**\n\n"
+        "Нажмите на сервер, чтобы включить или отключить его учет в общей статистике:"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=keyboards.toggle_panels_kb(panels, lang=lang),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
 @router.callback_query(F.data == "menu_delete_panel")
 async def cb_menu_delete_panel(callback: CallbackQuery):
     panels = crypto_storage.get_panels()

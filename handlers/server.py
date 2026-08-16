@@ -161,7 +161,18 @@ async def cb_server_status(callback: CallbackQuery):
 
     await client.close()
 
+    from core import crypto_storage
+    active_panel = crypto_storage.get_active_panel()
+    panel_id = active_panel.get("id") if active_panel else None
+    is_enabled = active_panel.get("enabled", True) if active_panel else True
+
+    stat_lbl = "🟢 Active" if is_enabled else "🔴 Disabled"
+    if lang == "ru":
+        stat_lbl = "🟢 Включен" if is_enabled else "🔴 Отключен"
+
     text = (
+        f"🖥 **Server:** `{active_panel.get('name', 'Server')}` (Stat: **{stat_lbl}**)\n\n" if lang == "en" else f"🖥 **Сервер:** `{active_panel.get('name', 'Сервер')}` (В статистике: **{stat_lbl}**)\n\n"
+    ) + (
         f"{t('hostname', lang)} `{hostname}`\n"
         f"{t('xui_ver', lang)} `{xui_version}`\n"
         f"{t('xray_ver', lang)} `{xray_version}`\n"
@@ -181,7 +192,7 @@ async def cb_server_status(callback: CallbackQuery):
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.server_menu_kb(lang=lang),
+            reply_markup=keyboards.server_menu_kb(panel_id=panel_id, is_enabled=is_enabled, lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
@@ -189,6 +200,40 @@ async def cb_server_status(callback: CallbackQuery):
             pass
         else:
             raise e
+
+@router.callback_query(F.data.startswith("toggle_panel_enable_"))
+async def cb_toggle_panel_enable(callback: CallbackQuery):
+    from core import crypto_storage
+    panel_id = callback.data.replace("toggle_panel_enable_", "")
+    lang = bot_settings.get_language()
+    
+    new_state = crypto_storage.toggle_panel_enabled(panel_id)
+    if new_state is not None:
+        panel_info = crypto_storage.load_credentials(panel_id)
+        p_name = panel_info.get("name", "Server") if panel_info else "Server"
+        
+        if new_state:
+            alert_msg = f"🟢 Server '{p_name}' enabled in statistics!" if lang == "en" else f"🟢 Сервер '{p_name}' включен в статистику!"
+        else:
+            alert_msg = f"🔴 Server '{p_name}' disabled from statistics!" if lang == "en" else f"🔴 Сервер '{p_name}' отключен из статистики!"
+        
+        await callback.answer(alert_msg, show_alert=True)
+        
+        active_panel = crypto_storage.get_active_panel()
+        if active_panel and active_panel.get("id") == panel_id:
+            await cb_server_status(callback)
+        else:
+            panels = crypto_storage.get_panels()
+            try:
+                await callback.message.edit_text(
+                    "👁 **Enable / Disable Servers in Statistics**\n\nClick a server to toggle its visibility in global statistics:" if lang == "en" else "👁 **Включение / Отключение серверов в статистике**\n\nНажмите на сервер, чтобы включить или отключить его учет в статистике:",
+                    reply_markup=keyboards.toggle_panels_kb(panels, lang=lang),
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                pass
+    else:
+        await callback.answer("Error toggling server state", show_alert=True)
 
 @router.callback_query(F.data == "action_restart_xray")
 async def cb_restart_xray(callback: CallbackQuery):
@@ -317,10 +362,11 @@ async def fetch_single_panel_status_card(p: dict, index: int, total: int, lang: 
 async def cb_all_panels_status(event):
     from core import crypto_storage
     lang = bot_settings.get_language()
-    panels = crypto_storage.get_panels()
+    all_panels = crypto_storage.get_panels()
+    panels = [p for p in all_panels if p.get("enabled", True)]
 
     if not panels:
-        msg = "❌ No 3x-ui servers connected." if lang == "en" else "❌ Нет подключенных серверов 3x-ui."
+        msg = "❌ No active/enabled 3x-ui servers found." if lang == "en" else "❌ Нет включенных серверов 3x-ui для отображения в статистике."
         if isinstance(event, CallbackQuery):
             await event.answer(msg, show_alert=True)
         else:

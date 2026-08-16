@@ -36,26 +36,55 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server",
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def panels_list_kb(panels: List[Dict[str, Any]], active_id: Optional[str], lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
     buttons = []
-    suffix_active = t("active_suffix", lang)
+    suffix_active = t("active_suffix", cur_lang)
     for p in panels:
         p_id = p.get("id")
         p_name = p.get("name", "Server")
         is_active = (p_id == active_id)
-        prefix = "🟢 " if is_active else "⚪ "
-        suffix = suffix_active if is_active else ""
-        
-        btn_text = f"{prefix}{p_name}{suffix}"
+        is_enabled = p.get("enabled", True)
+
+        if not is_enabled:
+            prefix = "🔴 "
+            dis_label = " (Disabled)" if cur_lang == "en" else " (Отключена)"
+            btn_text = f"{prefix}{p_name}{dis_label}"
+        elif is_active:
+            prefix = "🟢 "
+            btn_text = f"{prefix}{p_name}{suffix_active}"
+        else:
+            prefix = "⚪ "
+            btn_text = f"{prefix}{p_name}"
+
         if not is_active:
             buttons.append([InlineKeyboardButton(text=btn_text, callback_data=f"switch_panel_{p_id}")])
         else:
             buttons.append([InlineKeyboardButton(text=btn_text, callback_data="noop")])
 
+    btn_toggle = "👁 Enable/Disable" if cur_lang == "en" else "👁 Вкл/Выкл панели"
     buttons.append([
-        InlineKeyboardButton(text=t("btn_add_server", lang), callback_data="setup_panel"),
-        InlineKeyboardButton(text=t("btn_delete_server", lang), callback_data="menu_delete_panel")
+        InlineKeyboardButton(text=t("btn_add_server", cur_lang), callback_data="setup_panel"),
+        InlineKeyboardButton(text=btn_toggle, callback_data="menu_toggle_panels"),
+        InlineKeyboardButton(text=t("btn_delete_server", cur_lang), callback_data="menu_delete_panel")
     ])
-    buttons.append([InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")])
+    buttons.append([InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def toggle_panels_kb(panels: List[Dict[str, Any]], lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
+    buttons = []
+    for p in panels:
+        p_id = p.get("id")
+        p_name = p.get("name", "Server")
+        is_enabled = p.get("enabled", True)
+        status_icon = "🟢" if is_enabled else "🔴"
+        action_text = "Enabled (Click to disable)" if is_enabled else "Disabled (Click to enable)"
+        if cur_lang == "ru":
+            action_text = "Включена (Нажмите для выкл)" if is_enabled else "Отключена (Нажмите для вкл)"
+        
+        buttons.append([InlineKeyboardButton(text=f"{status_icon} {p_name}: {action_text}", callback_data=f"toggle_panel_enable_{p_id}")])
+
+    buttons.append([InlineKeyboardButton(text=t("btn_back_to_servers", cur_lang), callback_data="menu_select_panel")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def delete_panels_kb(panels: List[Dict[str, Any]], lang: Optional[str] = None) -> InlineKeyboardMarkup:

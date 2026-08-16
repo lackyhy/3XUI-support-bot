@@ -139,6 +139,17 @@ def rename_panel(panel_id: str, new_name: str) -> bool:
         return True
     return False
 
+def toggle_panel_enabled(panel_id: str) -> Optional[bool]:
+    storage = load_raw_storage()
+    panels = storage.get("panels", {})
+    if panel_id in panels:
+        current = panels[panel_id].get("enabled", True)
+        new_state = not current
+        panels[panel_id]["enabled"] = new_state
+        save_raw_storage(storage)
+        return new_state
+    return None
+
 def update_sub_port(panel_id: str, sub_port: int) -> bool:
     storage = load_raw_storage()
     panels = storage.get("panels", {})

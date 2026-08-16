@@ -406,12 +406,15 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
     import config
     bot_proxy_str = config.BOT_PROXY or ("None" if lang == "en" else "Отсутствует")
 
-    total_count = len(panels)
+    enabled_panels = [p for p in panels if p.get("enabled", True)]
+    disabled_panels = [p for p in panels if not p.get("enabled", True)]
+
+    total_count = len(enabled_panels)
     online_count = 0
     offline_count = 0
     panel_status_lines = []
 
-    if total_count == 0:
+    if not panels:
         panel_status_lines.append("• *No panels registered yet.*" if lang == "en" else "• *Панели ещё не подключены.*")
     else:
         async def check_panel(p):
@@ -435,7 +438,7 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
                     pass
                 return (p_name, False, "Connection Timeout")
 
-        tasks = [check_panel(p) for p in panels]
+        tasks = [check_panel(p) for p in enabled_panels]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for res in results:
@@ -447,6 +450,11 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
                 else:
                     offline_count += 1
                     panel_status_lines.append(f"• 🔴 **{name}** — `{detail}`")
+
+        for p in disabled_panels:
+            dis_name = p.get("name", "Server")
+            dis_lbl = "Disabled in stats" if lang == "en" else "Отключен в статистике"
+            panel_status_lines.append(f"• ⚪ **{dis_name}** — `{dis_lbl}`")
 
     lang_display = "English 🇬🇧" if lang == "en" else "Русский 🇷🇺"
     status_summary = f"🟢 Online: `{online_count}` | 🔴 Offline: `{offline_count}`" if total_count > 0 else "—"
