@@ -376,7 +376,7 @@ async def process_export_credentials(event):
     caption = (
         "📦 **Бэкап зашифрованной базы панелей 3x-ui**\n\n"
         f"🔑 **Ключ шифрования (ENCRYPTION_KEY):**\n`{key_str}`\n\n"
-        "ℹ️ *Для восстановления на любом другом боте просто отправьте этот файл боту и вставьте этот ключ в подпись к файлу!*"
+        "ℹ️ Для восстановления на другом сервере отправьте этот файл боту и укажите этот ключ в подписи!"
     )
 
     doc = FSInputFile(config.CREDENTIALS_FILE, filename="credentials.enc")
