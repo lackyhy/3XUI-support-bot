@@ -26,9 +26,6 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server",
         buttons.append([
             InlineKeyboardButton(text=t("btn_restart_xray", lang), callback_data="action_restart_xray")
         ])
-        buttons.append([
-            InlineKeyboardButton(text=t("btn_settings", lang), callback_data="menu_settings")
-        ])
     else:
         buttons.append([
             InlineKeyboardButton(text=t("btn_setup_panel", lang), callback_data="setup_panel")
@@ -67,7 +64,7 @@ def panels_list_kb(panels: List[Dict[str, Any]], active_id: Optional[str], lang:
         InlineKeyboardButton(text=btn_toggle, callback_data="menu_toggle_panels"),
         InlineKeyboardButton(text=t("btn_delete_server", cur_lang), callback_data="menu_delete_panel")
     ])
-    buttons.append([InlineKeyboardButton(text=t("btn_settings", cur_lang), callback_data="menu_bot_dashboard")])
+    buttons.append([InlineKeyboardButton(text=t("btn_settings", cur_lang), callback_data="menu_settings")])
     buttons.append([InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -122,7 +119,6 @@ def auth_type_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
 
 def settings_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=t("btn_bot_menu", lang), callback_data="menu_bot_dashboard")],
         [InlineKeyboardButton(text=t("btn_rename_panel", lang), callback_data="rename_panel")],
         [InlineKeyboardButton(text=t("btn_edit_setup", lang), callback_data="setup_panel")],
         [InlineKeyboardButton(text=t("btn_reset_credentials", lang), callback_data="delete_credentials")],
@@ -140,6 +136,7 @@ def bot_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=t("btn_export_backup", cur_lang), callback_data="export_credentials")],
         [InlineKeyboardButton(text=btn_switch, callback_data=f"set_lang_{target_lang}")],
         [InlineKeyboardButton(text=t("btn_switch_server", cur_lang), callback_data="menu_select_panel")],
+        [InlineKeyboardButton(text=t("btn_settings", cur_lang), callback_data="menu_settings")],
         [InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")]
     ])
 
