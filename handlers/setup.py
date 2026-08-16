@@ -395,7 +395,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 async def render_bot_menu_dashboard() -> Tuple[str, str]:
     lang = bot_settings.get_language()
-    panels = crypto_storage.get_all_panels()
+    panels = crypto_storage.get_panels()
     active_panel = crypto_storage.get_active_panel()
     active_name = active_panel.get("name", "—") if active_panel else "—"
 
