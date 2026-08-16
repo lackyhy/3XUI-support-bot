@@ -6,7 +6,7 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server",
     buttons = []
     if has_creds:
         buttons.append([
-            InlineKeyboardButton(text=t("btn_active_server", lang, name=active_panel_name), callback_data="menu_select_panel")
+            InlineKeyboardButton(text=t("btn_settings", lang), callback_data="menu_bot_dashboard")
         ])
         buttons.append([
             InlineKeyboardButton(text=t("btn_server_status", lang), callback_data="menu_server")
@@ -25,9 +25,6 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server",
         ])
         buttons.append([
             InlineKeyboardButton(text=t("btn_restart_xray", lang), callback_data="action_restart_xray")
-        ])
-        buttons.append([
-            InlineKeyboardButton(text=t("btn_settings", lang), callback_data="menu_settings")
         ])
     else:
         buttons.append([
