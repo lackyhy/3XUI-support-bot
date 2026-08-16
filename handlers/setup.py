@@ -456,13 +456,15 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
             dis_lbl = "Disabled in stats" if lang == "en" else "Отключен в статистике"
             panel_status_lines.append(f"• ⚪ **{dis_name}** — `{dis_lbl}`")
 
+    disabled_count = len(disabled_panels)
+    total_panels_count = len(panels)
     lang_display = "English 🇬🇧" if lang == "en" else "Русский 🇷🇺"
-    status_summary = f"🟢 Online: `{online_count}` | 🔴 Offline: `{offline_count}`" if total_count > 0 else "—"
 
     if lang == "en":
+        status_summary = f"🟢 Online: `{online_count}` | 🔴 Offline: `{offline_count}` | ⚪ Disabled: `{disabled_count}`" if total_panels_count > 0 else "—"
         text = (
             f"🤖 **Bot Settings & Multi-Panel Dashboard**\n\n"
-            f"🖥 **Total Panels:** `{total_count}`\n"
+            f"🖥 **Total Panels:** `{total_panels_count}`\n"
             f"📊 **Panels Health:** {status_summary}\n"
             f"🟢 **Active Server:** `{active_name}`\n"
             f"🌐 **Bot Proxy:** `{bot_proxy_str}`\n"
@@ -472,9 +474,10 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
             "Choose an option below to manage bot configuration:"
         )
     else:
+        status_summary = f"🟢 Онлайн: `{online_count}` | 🔴 Офлайн: `{offline_count}` | ⚪ Отключены: `{disabled_count}`" if total_panels_count > 0 else "—"
         text = (
             f"🤖 **Настройки бота и Мониторинг панелей**\n\n"
-            f"🖥 **Всего панелей:** `{total_count}`\n"
+            f"🖥 **Всего панелей:** `{total_panels_count}`\n"
             f"📊 **Статус панелей:** {status_summary}\n"
             f"🟢 **Активный сервер:** `{active_name}`\n"
             f"🌐 **Прокси бота:** `{bot_proxy_str}`\n"
