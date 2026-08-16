@@ -735,18 +735,24 @@ async def cb_add_client_start(callback: CallbackQuery, state: FSMContext):
 
     inbounds = res.get("obj", []) if res.get("success") else []
     if not inbounds:
-        await callback.message.edit_text("❌ Нет доступных инбаундов для добавления клиента.", reply_markup=keyboards.main_menu_kb())
+        await callback.message.edit_text("❌ No available inbounds for client creation." if lang == "en" else "❌ Нет доступных инбаундов для добавления клиента.", reply_markup=keyboards.main_menu_kb(lang=lang))
         await callback.answer()
         return
 
     selected_ids = []
     await state.update_data(all_inbounds=inbounds, selected_inbound_ids=selected_ids)
 
-    await callback.message.edit_text(
-        "➕ **Выберите инбаунды для добавления клиента:**\n\n"
+    msg_txt = (
+        "➕ **Select Inbounds for New Client:**\n\n"
+        "Click on connections to add ➕ or remove ✅ checkmark.\n"
+        "You can select one, multiple, or ALL inbounds at once!" if lang == "en" else "➕ **Выберите инбаунды для добавления клиента:**\n\n"
         "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
-        "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!",
-        reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids),
+        "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!"
+    )
+
+    await callback.message.edit_text(
+        msg_txt,
+        reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids, lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
@@ -757,23 +763,30 @@ async def cb_add_client_toggle_ib(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     inbounds = data.get("all_inbounds", [])
     selected_ids = data.get("selected_inbound_ids", [])
+    lang = bot_settings.get_language()
 
     if target_ib_id in selected_ids:
         selected_ids.remove(target_ib_id)
-        await callback.answer("Инбаунд убран из выбора")
+        await callback.answer("Inbound removed from selection" if lang == "en" else "Инбаунд убран из выбора")
     else:
         selected_ids.append(target_ib_id)
-        await callback.answer("Инбаунд добавлен в выбор")
+        await callback.answer("Inbound added to selection" if lang == "en" else "Инбаунд добавлен в выбор")
 
     await state.update_data(selected_inbound_ids=selected_ids)
+
+    msg_txt = (
+        "➕ **Select Inbounds for New Client:**\n\n"
+        "Click on connections to add ➕ or remove ✅ checkmark.\n"
+        "You can select one, multiple, or ALL inbounds at once!" if lang == "en" else "➕ **Выберите инбаунды для добавления клиента:**\n\n"
+        "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
+        "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!"
+    )
 
     from aiogram.exceptions import TelegramBadRequest
     try:
         await callback.message.edit_text(
-            "➕ **Выберите инбаунды для добавления клиента:**\n\n"
-            "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
-            "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!",
-            reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids),
+            msg_txt,
+            reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids, lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest:
@@ -784,23 +797,30 @@ async def cb_add_client_toggle_all(callback: CallbackQuery, state: FSMContext):
     action = callback.data.split("_")[4]
     data = await state.get_data()
     inbounds = data.get("all_inbounds", [])
+    lang = bot_settings.get_language()
 
     if action == "on":
         selected_ids = [ib.get("id") for ib in inbounds]
-        await callback.answer("Выбраны все инбаунды!")
+        await callback.answer("All inbounds selected!" if lang == "en" else "Выбраны все инбаунды!")
     else:
         selected_ids = []
-        await callback.answer("Выбор сброшен")
+        await callback.answer("Selection cleared" if lang == "en" else "Выбор сброшен")
 
     await state.update_data(selected_inbound_ids=selected_ids)
+
+    msg_txt = (
+        "➕ **Select Inbounds for New Client:**\n\n"
+        "Click on connections to add ➕ or remove ✅ checkmark.\n"
+        "You can select one, multiple, or ALL inbounds at once!" if lang == "en" else "➕ **Выберите инбаунды для добавления клиента:**\n\n"
+        "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
+        "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!"
+    )
 
     from aiogram.exceptions import TelegramBadRequest
     try:
         await callback.message.edit_text(
-            "➕ **Выберите инбаунды для добавления клиента:**\n\n"
-            "Нажимайте на подключения, чтобы добавить ➕ или убрать ✅ галочку.\n"
-            "Вы можете выбрать один, несколько или ВСЕ инбаунды сразу!",
-            reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids),
+            msg_txt,
+            reply_markup=keyboards.add_client_inbounds_multiselect_kb(inbounds, selected_ids, lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest:
@@ -810,16 +830,19 @@ async def cb_add_client_toggle_all(callback: CallbackQuery, state: FSMContext):
 async def cb_add_client_confirm_inbounds(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     selected_ids = data.get("selected_inbound_ids", [])
+    lang = bot_settings.get_language()
+
     if not selected_ids:
-        await callback.answer("⚠️ Пожалуйста, выберите хотя бы один инбаунд!", show_alert=True)
+        await callback.answer("⚠️ Please select at least one inbound!" if lang == "en" else "⚠️ Пожалуйста, выберите хотя бы один инбаунд!", show_alert=True)
         return
 
     await state.set_state(AddClientStates.waiting_for_email)
+    msg_txt = (
+        f"➕ **Add New Client** (Step 1 of 5)\n\nSelected inbounds: **{len(selected_ids)}**\n\nEnter **Client Email / Name** (e.g. `alex_vpn`):" if lang == "en" else f"➕ **Добавление нового клиента** (Шаг 1 из 5)\n\nВыбрано подключений: **{len(selected_ids)}**\n\nВведите **Email / Имя клиента** (например: `alex_vpn`):"
+    )
     await callback.message.edit_text(
-        f"➕ **Добавление нового клиента** (Шаг 1 из 5)\n\n"
-        f"Выбрано подключений: **{len(selected_ids)}**\n\n"
-        f"Введите **Email / Имя клиента** (например: `alex_vpn`):",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
@@ -829,10 +852,15 @@ async def cb_add_client_select_inbound(callback: CallbackQuery, state: FSMContex
     inbound_id = int(callback.data.split("_")[3])
     await state.update_data(selected_inbound_ids=[inbound_id])
     await state.set_state(AddClientStates.waiting_for_email)
+    lang = bot_settings.get_language()
+
+    msg_txt = (
+        "➕ **Add New Client** (Step 1 of 5)\n\nEnter **Client Email / Name** (e.g. `alex_vpn`):" if lang == "en" else "➕ **Добавление нового клиента** (Шаг 1 из 5)\n\nВведите **Email / Имя клиента** (например: `alex_vpn`):"
+    )
 
     await callback.message.edit_text(
-        "➕ **Добавление нового клиента** (Шаг 1 из 5)\n\nВведите **Email / Имя клиента** (например: `alex_vpn`):",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
@@ -840,85 +868,101 @@ async def cb_add_client_select_inbound(callback: CallbackQuery, state: FSMContex
 @router.message(AddClientStates.waiting_for_email)
 async def process_add_email(message: Message, state: FSMContext):
     email = message.text.strip()
+    lang = bot_settings.get_language()
+
     if not email:
-        await message.answer("❌ Имя клиента не может быть пустым. Введите новое имя:", reply_markup=keyboards.cancel_kb())
+        await message.answer("❌ Client name cannot be empty. Enter client name:" if lang == "en" else "❌ Имя клиента не может быть пустым. Введите новое имя:", reply_markup=keyboards.cancel_kb(lang=lang))
         return
 
     await state.update_data(email=email)
     await state.set_state(AddClientStates.waiting_for_limit_gb)
 
+    msg_txt = (
+        "➕ **Add New Client** (Step 2 of 5)\n\nSpecify **Traffic Limit in GB** (e.g. `50` or `0` for unlimited):" if lang == "en" else "➕ **Добавление нового клиента** (Шаг 2 из 5)\n\nУкажите **Лимит трафика в ГБ** (например: `50` или `0` для безлимита):"
+    )
+
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 2 из 5)\n\n"
-        "Укажите **Лимит трафика в ГБ** (например: `50` или `0` для безлимита):",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
 
 @router.message(AddClientStates.waiting_for_limit_gb)
 async def process_add_gb(message: Message, state: FSMContext):
+    lang = bot_settings.get_language()
     try:
         limit_gb = float(message.text.strip().replace(',', '.'))
         if limit_gb < 0:
             raise ValueError()
     except ValueError:
-        await message.answer("❌ Укажите число ГБ (например `100` или `0`):", reply_markup=keyboards.cancel_kb())
+        await message.answer("❌ Enter traffic limit in GB (e.g. `100` or `0`):" if lang == "en" else "❌ Укажите число ГБ (например `100` или `0`):", reply_markup=keyboards.cancel_kb(lang=lang))
         return
 
     await state.update_data(limit_gb=limit_gb)
     await state.set_state(AddClientStates.waiting_for_expiry_days)
 
+    msg_txt = (
+        "➕ **Add New Client** (Step 3 of 5)\n\nSpecify **Validity period in days** (e.g. `30` or `0` for unlimited):" if lang == "en" else "➕ **Добавление нового клиента** (Шаг 3 из 5)\n\nУкажите **Срок действия в днях** (например: `30` или `0` для бессрочного):"
+    )
+
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 3 из 5)\n\n"
-        "Укажите **Срок действия в днях** (например: `30` или `0` для бессрочного):",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
 
 @router.message(AddClientStates.waiting_for_expiry_days)
 async def process_add_expiry(message: Message, state: FSMContext):
+    lang = bot_settings.get_language()
     try:
         expiry_days = int(message.text.strip())
         if expiry_days < 0:
             raise ValueError()
     except ValueError:
-        await message.answer("❌ Укажите количество дней числом (например `30` или `0`):", reply_markup=keyboards.cancel_kb())
+        await message.answer("❌ Enter number of days (e.g. `30` or `0`):" if lang == "en" else "❌ Укажите количество дней числом (например `30` или `0`):", reply_markup=keyboards.cancel_kb(lang=lang))
         return
 
     await state.update_data(expiry_days=expiry_days)
     await state.set_state(AddClientStates.waiting_for_limit_ip)
 
+    msg_txt = (
+        "➕ **Add New Client** (Step 4 of 5)\n\nSpecify **IP / Devices Limit** (e.g. `2` or `0` for no limit):" if lang == "en" else "➕ **Добавление нового клиента** (Шаг 4 из 5)\n\nУкажите **Лимит IP / Устройств** (например: `2` или `0` для безлимита):"
+    )
+
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 4 из 5)\n\n"
-        "Укажите **Лимит IP / Устройств** (например: `2` или `0` для безлимита):",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
 
 @router.message(AddClientStates.waiting_for_limit_ip)
 async def process_add_limit_ip(message: Message, state: FSMContext):
+    lang = bot_settings.get_language()
     try:
         limit_ip = int(message.text.strip())
         if limit_ip < 0:
             raise ValueError()
     except ValueError:
-        await message.answer("❌ Укажите лимит устройств числом (например `2` или `0`):", reply_markup=keyboards.cancel_kb())
+        await message.answer("❌ Enter device limit number (e.g. `2` or `0`):" if lang == "en" else "❌ Укажите лимит устройств числом (например `2` или `0`):", reply_markup=keyboards.cancel_kb(lang=lang))
         return
 
     await state.update_data(limit_ip=limit_ip)
     await state.set_state(AddClientStates.waiting_for_initial_status)
 
+    msg_txt = (
+        "➕ **Add New Client** (Step 5 of 5)\n\nSelect **Initial Connection Status**:\n\n• 🟢 **Enabled** (Active immediately)\n• 🔴 **Disabled** (Not active)" if lang == "en" else "➕ **Добавление нового клиента** (Шаг 5 из 5)\n\nВыберите **Начальный статус соединения**:\n\n• 🟢 **Включен** (Сразу активен)\n• 🔴 **Отключен** (Изначально не подключен ни к какому коннекту)"
+    )
+
     await message.answer(
-        "➕ **Добавление нового клиента** (Шаг 5 из 5)\n\n"
-        "Выберите **Начальный статус соединения**:\n\n"
-        "• 🟢 **Включен** (Сразу активен)\n"
-        "• 🔴 **Отключен** (Изначально не подключен ни к какому коннекту)",
-        reply_markup=keyboards.initial_status_kb(),
+        msg_txt,
+        reply_markup=keyboards.initial_status_kb(lang=lang),
         parse_mode="Markdown"
     )
 
 @router.callback_query(AddClientStates.waiting_for_initial_status, F.data.startswith("client_init_enable_"))
 async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
     enable_val = (callback.data.split("_")[3] == "1")
+    lang = bot_settings.get_language()
 
     data = await state.get_data()
     await state.clear()
@@ -934,11 +978,11 @@ async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
     limit_ip = data.get("limit_ip")
     client_uuid = str(uuid.uuid4())
 
-    status_msg = await callback.message.edit_text("🔄 **Создание нового клиента...**", parse_mode="Markdown")
+    status_msg = await callback.message.edit_text("🔄 **Creating new client...**" if lang == "en" else "🔄 **Создание нового клиента...**", parse_mode="Markdown")
 
     client_api = ThreeXUIClient.from_storage()
     if not client_api:
-        await status_msg.edit_text("❌ Ошибка авторизации. Панель не настроена.")
+        await status_msg.edit_text("❌ Auth error." if lang == "en" else "❌ Ошибка авторизации. Панель не настроена.")
         await callback.answer()
         return
 
@@ -956,21 +1000,30 @@ async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
         if len(selected_ids) > 1:
             await client_api.attach_client_to_inbounds(email, selected_ids)
 
-        st_text = "🟢 Включен (Активен)" if enable_val else "🔴 Отключен (Не подключен)"
-        await status_msg.edit_text(
-            f"✅ **Клиент `{email}` успешно создан!**\n\n"
+        st_text = t("status_active", lang) if enable_val else t("status_disabled", lang)
+        msg_txt = (
+            f"✅ **Client `{email}` created successfully!**\n\n"
+            f"🆔 UUID: `{client_uuid}`\n"
+            f"Status: **{st_text}**\n"
+            f"🌐 Attached inbounds: **{len(selected_ids)}**\n"
+            f"📊 GB Limit: `{limit_gb if limit_gb > 0 else 'Unlimited'}`\n"
+            f"📅 Period: `{expiry_days if expiry_days > 0 else 'Unlimited'} days`" if lang == "en" else f"✅ **Клиент `{email}` успешно создан!**\n\n"
             f"🆔 UUID: `{client_uuid}`\n"
             f"Статус соединения: **{st_text}**\n"
             f"🌐 Привязан к инбаундам: **{len(selected_ids)} шт.**\n"
             f"📊 Лимит ГБ: `{limit_gb if limit_gb > 0 else 'Безлимит'}`\n"
-            f"📅 Срок: `{expiry_days if expiry_days > 0 else 'Бессрочно'} дн.`",
-            reply_markup=keyboards.client_detail_kb(first_inbound_id, client_uuid, email, enable_val),
+            f"📅 Срок: `{expiry_days if expiry_days > 0 else 'Бессрочно'} дн.`"
+        )
+
+        await status_msg.edit_text(
+            msg_txt,
+            reply_markup=keyboards.client_detail_kb(first_inbound_id, client_uuid, email, enable_val, lang=lang),
             parse_mode="Markdown"
         )
     else:
         await status_msg.edit_text(
-            f"❌ **Ошибка при создании клиента:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.inbound_detail_kb(first_inbound_id),
+            f"❌ **Error creating client:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка при создании клиента:**\n`{res.get('msg')}`",
+            reply_markup=keyboards.inbound_detail_kb(first_inbound_id, lang=lang),
             parse_mode="Markdown"
         )
     await client_api.close()
@@ -979,10 +1032,14 @@ async def cb_process_add_status(callback: CallbackQuery, state: FSMContext):
 # SEARCH CLIENT
 @router.callback_query(F.data == "menu_search_client")
 async def cb_search_client_start(callback: CallbackQuery, state: FSMContext):
+    lang = bot_settings.get_language()
     await state.set_state(SearchClientStates.waiting_for_query)
+    msg_txt = (
+        "🔍 **Search Client**\n\nEnter Client Name (Email) or UUID to search:" if lang == "en" else "🔍 **Поиск клиента**\n\nВведите Имя (Email) или UUID клиента для поиска:"
+    )
     await callback.message.edit_text(
-        "🔍 **Поиск клиента**\n\nВведите Имя (Email) или UUID клиента для поиска:",
-        reply_markup=keyboards.cancel_kb(),
+        msg_txt,
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
@@ -991,19 +1048,20 @@ async def cb_search_client_start(callback: CallbackQuery, state: FSMContext):
 async def process_search_query(message: Message, state: FSMContext):
     query = message.text.strip().lower()
     await state.clear()
+    lang = bot_settings.get_language()
 
-    status_msg = await message.answer("🔄 **Поиск клиента по всем инбаундам...**", parse_mode="Markdown")
+    status_msg = await message.answer("🔄 **Searching client across inbounds...**" if lang == "en" else "🔄 **Поиск клиента по всем инбаундам...**", parse_mode="Markdown")
 
     client_api = ThreeXUIClient.from_storage()
     if not client_api:
-        await status_msg.edit_text("❌ Ошибка авторизации. Настройки не найдены.")
+        await status_msg.edit_text("❌ Auth error." if lang == "en" else "❌ Ошибка авторизации. Настройки не найдены.")
         return
 
     res = await client_api.get_inbounds()
     await client_api.close()
 
     if not res.get("success"):
-        await status_msg.edit_text(f"❌ Ошибка поиска: {res.get('msg')}")
+        await status_msg.edit_text(f"❌ Search error: {res.get('msg')}" if lang == "en" else f"❌ Ошибка поиска: {res.get('msg')}")
         return
 
     inbounds = res.get("obj", [])
@@ -1020,9 +1078,12 @@ async def process_search_query(message: Message, state: FSMContext):
                 found_items.append((ib_id, c))
 
     if not found_items:
+        msg_txt = (
+            f"🔍 **Search results for `{query}`:**\n\nNothing found." if lang == "en" else f"🔍 **Результаты поиска по запросу `{query}`:**\n\nНичего не найдено."
+        )
         await status_msg.edit_text(
-            f"🔍 **Результаты поиска по запросу `{query}`:**\n\nНичего не найдено.",
-            reply_markup=keyboards.main_menu_kb(),
+            msg_txt,
+            reply_markup=keyboards.main_menu_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -1037,10 +1098,14 @@ async def process_search_query(message: Message, state: FSMContext):
             callback_data=f"client_view_{ib_id}_{uuid_val}"
         )])
 
-    buttons.append([InlineKeyboardButton(text="🔙 Главное меню", callback_data="menu_main")])
+    buttons.append([InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")])
+
+    msg_txt = (
+        f"🔍 **Search results for `{query}`:**\nFound matches: **{len(found_items)}**" if lang == "en" else f"🔍 **Результаты поиска по запросу `{query}`:**\nНайдено совпадений: **{len(found_items)}**"
+    )
 
     await status_msg.edit_text(
-        f"🔍 **Результаты поиска по запросу `{query}`:**\nНайдено совпадений: **{len(found_items)}**",
+        msg_txt,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         parse_mode="Markdown"
     )
