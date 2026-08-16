@@ -77,7 +77,8 @@
 ### 1. Клонирование репозитория и переход в папку
 
 ```bash
-cd ~/project/xuiSup
+git clone https://github.com/lackyhy/3XUI-support-bot.git
+cd 3XUI-support-bot/
 ```
 
 ### 2. Создание и активация виртуального окружения
@@ -90,7 +91,7 @@ source venv/bin/activate
 ### 3. Установка зависимостей
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### 4. Первый запуск и автоматическая настройка
