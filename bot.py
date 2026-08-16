@@ -22,16 +22,8 @@ async def create_bot_instance() -> Bot:
         return Bot(token=config.BOT_TOKEN)
 
     logger.info(f"Connecting to Telegram via Proxy: {config.BOT_PROXY}")
-    proxy_url = config.BOT_PROXY
     from aiogram.client.session.aiohttp import AiohttpSession
-
-    if proxy_url.startswith("socks"):
-        from aiohttp_socks import ProxyConnector
-        connector = ProxyConnector.from_url(proxy_url)
-        session = AiohttpSession(connector=connector)
-    else:
-        session = AiohttpSession(proxy=proxy_url)
-
+    session = AiohttpSession(proxy=config.BOT_PROXY)
     return Bot(token=config.BOT_TOKEN, session=session)
 
 async def main():
