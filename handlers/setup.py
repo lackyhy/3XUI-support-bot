@@ -231,3 +231,157 @@ async def process_rename_panel(message: Message, state: FSMContext):
             "❌ Ошибка при переименовании сервера.",
             reply_markup=get_main_menu_markup()
         )
+
+# DOCUMENT IMPORT & BACKUP EXPORT
+from aiogram.filters import Command
+from states.states import ImportCredentialsStates
+import io
+
+async def import_credentials_bytes(message: Message, file_bytes: bytes, key_str: str, state: FSMContext):
+    from cryptography.fernet import Fernet
+    import base64, hashlib, json, config
+
+    key = key_str.strip()
+    payload = None
+    derived_fernet_key = None
+
+    # Try 1: Key as URL-safe base64 Fernet key
+    try:
+        f = Fernet(key.encode('utf-8'))
+        decrypted = f.decrypt(file_bytes)
+        payload = json.loads(decrypted.decode('utf-8'))
+        derived_fernet_key = key
+    except Exception:
+        pass
+
+    # Try 2: Key as raw user passphrase
+    if payload is None:
+        try:
+            key_bytes = hashlib.sha256(key.encode('utf-8')).digest()
+            derived_fernet_key = base64.urlsafe_b64encode(key_bytes).decode('utf-8')
+            f = Fernet(derived_fernet_key.encode('utf-8'))
+            decrypted = f.decrypt(file_bytes)
+            payload = json.loads(decrypted.decode('utf-8'))
+        except Exception:
+            pass
+
+    if payload is None or not isinstance(payload, dict):
+        await message.answer(
+            "❌ **Ошибка расшифровки файла `credentials.enc`!**\n\n"
+            "Предоставленный ключ не подходит к этому файлу.\n"
+            "Пожалуйста, проверьте ключ и отправьте файл или ключ заново.",
+            parse_mode="Markdown"
+        )
+        return
+
+    # Save to data/credentials.enc
+    config.CREDENTIALS_FILE.parent.mkdir(exist_ok=True)
+    with open(config.CREDENTIALS_FILE, "wb") as f:
+        f.write(file_bytes)
+
+    # Update ENCRYPTION_KEY in .env file
+    env_file = config.BASE_DIR / ".env"
+    if env_file.exists():
+        lines = []
+        key_found = False
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("ENCRYPTION_KEY="):
+                    lines.append(f"ENCRYPTION_KEY={derived_fernet_key}\n")
+                    key_found = True
+                else:
+                    lines.append(line)
+        if not key_found:
+            lines.append(f"ENCRYPTION_KEY={derived_fernet_key}\n")
+        with open(env_file, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+
+    # Update in-memory config & crypto_storage
+    config.ENCRYPTION_KEY = derived_fernet_key
+    crypto_storage.init_fernet(derived_fernet_key)
+
+    await state.clear()
+
+    panels_count = len(payload.get("panels", [])) if isinstance(payload, dict) else 0
+    active_panel = crypto_storage.get_active_panel()
+    active_name = active_panel.get("name", "Основной сервер") if active_panel else "—"
+
+    await message.answer(
+        f"✅ **Файл `credentials.enc` успешно импортирован!**\n\n"
+        f"🔑 Ключ шифрования обновлён и сохранён в `.env`.\n"
+        f"🖥 Загружено панелей 3x-ui: **{panels_count}**\n"
+        f"🟢 Активный сервер: `{active_name}`",
+        reply_markup=get_main_menu_markup(),
+        parse_mode="Markdown"
+    )
+
+@router.message(F.document)
+async def process_document_import(message: Message, state: FSMContext):
+    doc = message.document
+    filename = doc.file_name or ""
+    if not (filename.endswith(".enc") or "credentials" in filename.lower()):
+        return
+
+    caption = (message.caption or "").strip()
+
+    # Download file bytes
+    bot = message.bot
+    file_info = await bot.get_file(doc.file_id)
+    file_bytes_io = await bot.download_file(file_info.file_path)
+    if isinstance(file_bytes_io, io.BytesIO):
+        file_bytes = file_bytes_io.getvalue()
+    else:
+        file_bytes = file_bytes_io.read()
+
+    if caption:
+        await import_credentials_bytes(message, file_bytes, caption, state)
+    else:
+        await state.update_data(import_file_bytes=file_bytes)
+        await state.set_state(ImportCredentialsStates.waiting_for_key)
+        await message.answer(
+            "📦 **Получен файл `credentials.enc`!**\n\n"
+            "🔑 Пожалуйста, отправьте **ключ шифрования (ENCRYPTION_KEY)** для распаковки этого файла:",
+            reply_markup=keyboards.cancel_kb(),
+            parse_mode="Markdown"
+        )
+
+@router.message(ImportCredentialsStates.waiting_for_key)
+async def process_import_key(message: Message, state: FSMContext):
+    key = message.text.strip()
+    data = await state.get_data()
+    file_bytes = data.get("import_file_bytes")
+    if not file_bytes:
+        await message.answer("❌ Файл не найден. Отправьте `.enc` файл заново.")
+        await state.clear()
+        return
+
+    await import_credentials_bytes(message, file_bytes, key, state)
+
+@router.message(Command("export"))
+@router.message(Command("backup"))
+@router.callback_query(F.data == "export_credentials")
+async def process_export_credentials(event):
+    import config
+    from aiogram.types import FSInputFile
+
+    if not config.CREDENTIALS_FILE.exists():
+        msg = "❌ Файл зашифрованной базы `data/credentials.enc` еще не создан."
+        if isinstance(event, CallbackQuery):
+            await event.answer(msg, show_alert=True)
+        else:
+            await event.answer(msg)
+        return
+
+    key_str = config.ENCRYPTION_KEY or "—"
+    caption = (
+        "📦 **Бэкап зашифрованной базы панелей 3x-ui**\n\n"
+        f"🔑 **Ключ шифрования (ENCRYPTION_KEY):**\n`{key_str}`\n\n"
+        "ℹ️ *Для восстановления на любом другом боте просто отправьте этот файл боту и вставьте этот ключ в подпись к файлу!*"
+    )
+
+    doc = FSInputFile(config.CREDENTIALS_FILE, filename="credentials.enc")
+    if isinstance(event, CallbackQuery):
+        await event.answer("Отправка бэкапа...")
+        await event.message.answer_document(doc, caption=caption, parse_mode="Markdown")
+    else:
+        await event.answer_document(doc, caption=caption, parse_mode="Markdown")

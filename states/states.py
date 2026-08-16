@@ -34,3 +34,6 @@ class SearchClientStates(StatesGroup):
 
 class SetSubPortStates(StatesGroup):
     waiting_for_sub_port = State()
+
+class ImportCredentialsStates(StatesGroup):
+    waiting_for_key = State()

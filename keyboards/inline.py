@@ -87,6 +87,7 @@ def auth_type_kb() -> InlineKeyboardMarkup:
 
 def settings_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📦 Скачать бэкап базы (credentials.enc)", callback_data="export_credentials")],
         [InlineKeyboardButton(text="✏️ Переименовать текущий сервер", callback_data="rename_panel")],
         [InlineKeyboardButton(text="✏️ Изменить параметры подключения", callback_data="setup_panel")],
         [InlineKeyboardButton(text="🗑 Сбросить зашифрованные данные", callback_data="delete_credentials")],
