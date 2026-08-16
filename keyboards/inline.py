@@ -3,32 +3,37 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from core.i18n import t
 
 def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server", lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
     buttons = []
     if has_creds:
         buttons.append([
-            InlineKeyboardButton(text=t("btn_active_server", lang, name=active_panel_name), callback_data="menu_select_panel")
+            InlineKeyboardButton(text=t("btn_active_server", cur_lang, name=active_panel_name), callback_data="menu_select_panel")
         ])
         buttons.append([
-            InlineKeyboardButton(text=t("btn_server_status", lang), callback_data="menu_server")
+            InlineKeyboardButton(text=t("btn_server_status", cur_lang), callback_data="menu_server")
         ])
         buttons.append([
-            InlineKeyboardButton(text=t("btn_clients", lang), callback_data="menu_clients_hub")
+            InlineKeyboardButton(text=t("btn_clients", cur_lang), callback_data="menu_clients_hub")
         ])
         buttons.append([
-            InlineKeyboardButton(text=t("btn_inbounds", lang), callback_data="menu_inbounds")
+            InlineKeyboardButton(text=t("btn_inbounds", cur_lang), callback_data="menu_inbounds")
         ])
         buttons.append([
-            InlineKeyboardButton(text=t("btn_add_client", lang), callback_data="menu_add_client")
+            InlineKeyboardButton(text=t("btn_add_client", cur_lang), callback_data="menu_add_client")
         ])
         buttons.append([
-            InlineKeyboardButton(text=t("btn_search_client", lang), callback_data="menu_search_client")
+            InlineKeyboardButton(text=t("btn_search_client", cur_lang), callback_data="menu_search_client")
         ])
         buttons.append([
-            InlineKeyboardButton(text=t("btn_restart_xray", lang), callback_data="action_restart_xray")
+            InlineKeyboardButton(text=t("btn_restart_xray", cur_lang), callback_data="action_restart_xray")
+        ])
+        btn_bot_menu = "⚙️ Menu (/menu)" if cur_lang == "en" else "⚙️ Меню бота (/menu)"
+        buttons.append([
+            InlineKeyboardButton(text=btn_bot_menu, callback_data="menu_bot_dashboard")
         ])
     else:
         buttons.append([
-            InlineKeyboardButton(text=t("btn_setup_panel", lang), callback_data="setup_panel")
+            InlineKeyboardButton(text=t("btn_setup_panel", cur_lang), callback_data="setup_panel")
         ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
