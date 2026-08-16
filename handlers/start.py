@@ -2,6 +2,7 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 
 from core import crypto_storage
 from keyboards import inline as keyboards
@@ -63,11 +64,17 @@ async def cb_menu_select_panel(callback: CallbackQuery):
     select_lbl = t("select_server_to_switch", lang)
 
     text = f"{title}\n\n{select_lbl}"
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboards.panels_list_kb(panels, active_id, lang=lang),
-        parse_mode="Markdown"
-    )
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.panels_list_kb(panels, active_id, lang=lang),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            raise e
     await callback.answer()
 
 @router.callback_query(F.data.startswith("switch_panel_"))
