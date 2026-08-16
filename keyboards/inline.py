@@ -102,9 +102,11 @@ def settings_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
 def bot_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
     cur_lang = lang or "en"
     target_lang = "ru" if cur_lang == "en" else "en"
+    btn_all_status = "📊 Status of All Panels" if cur_lang == "en" else "📊 Статус всех панелей"
     btn_switch = t("btn_switch_lang_ru", cur_lang) if cur_lang == "en" else t("btn_switch_lang_en", cur_lang)
 
     return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=btn_all_status, callback_data="menu_all_panels_status")],
         [InlineKeyboardButton(text=t("btn_export_backup", cur_lang), callback_data="export_credentials")],
         [InlineKeyboardButton(text=btn_switch, callback_data=f"set_lang_{target_lang}")],
         [InlineKeyboardButton(text=t("btn_switch_server", cur_lang), callback_data="menu_select_panel")],
