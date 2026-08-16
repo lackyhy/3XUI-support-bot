@@ -22,7 +22,6 @@ class AdminMiddleware(BaseMiddleware):
             if isinstance(event, Message):
                 await event.answer(
                     f"⛔ **Доступ запрещен!**\n\n"
-                    f"Этот бот предназначен исключительно для одного администратора (`ID: {config.ADMIN_ID}`).\n"
                     f"Ваш ID: `{user.id}`",
                     parse_mode="Markdown"
                 )
