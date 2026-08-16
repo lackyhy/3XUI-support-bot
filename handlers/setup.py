@@ -426,31 +426,16 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
             if not client:
                 return (p_name, False, "Auth failed", 0, 0)
             try:
-                res = await asyncio.wait_for(client.get_sys_status(), timeout=4.0)
-                up_b = 0
-                down_b = 0
-                if res.get("success"):
-                    obj = res.get("obj", {})
-                    net_traffic = obj.get("netTraffic") if isinstance(obj.get("netTraffic"), dict) else {}
-                    if net_traffic and ("sent" in net_traffic or "recv" in net_traffic):
-                        up_b = net_traffic.get("sent", 0)
-                        down_b = net_traffic.get("recv", 0)
-                    else:
-                        net_io = obj.get("netIO") if isinstance(obj.get("netIO"), dict) else {}
-                        up_b = net_io.get("up", 0) or net_io.get("sent", 0)
-                        down_b = net_io.get("down", 0) or net_io.get("recv", 0)
-
-                inb_res = await asyncio.wait_for(client.get_inbounds(), timeout=4.0)
+                res = await asyncio.wait_for(client.get_inbounds(), timeout=5.0)
                 await client.close()
-                if inb_res.get("success"):
-                    inbounds_cnt = len(inb_res.get("obj", []))
-                    if up_b == 0 and down_b == 0:
-                        for inb in inb_res.get("obj", []):
-                            up_b += inb.get("up", 0)
-                            down_b += inb.get("down", 0)
+                if res.get("success"):
+                    inbounds_list = res.get("obj", []) or []
+                    inbounds_cnt = len(inbounds_list)
+                    up_b = sum((inb.get("up", 0) or 0) for inb in inbounds_list)
+                    down_b = sum((inb.get("down", 0) or 0) for inb in inbounds_list)
                     return (p_name, True, f"{inbounds_cnt} inbounds", up_b, down_b)
                 else:
-                    return (p_name, False, inb_res.get("msg", "Error"), up_b, down_b)
+                    return (p_name, False, res.get("msg", "Error"), 0, 0)
             except Exception:
                 try:
                     await client.close()
