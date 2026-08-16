@@ -54,26 +54,18 @@ async def cb_menu_main(callback: CallbackQuery, state: FSMContext):
 # MULTI-PANEL SWITCHING MENU
 @router.callback_query(F.data == "menu_select_panel")
 async def cb_menu_select_panel(callback: CallbackQuery):
+    lang = bot_settings.get_language()
     panels = crypto_storage.get_panels()
     active_panel = crypto_storage.get_active_panel()
     active_id = active_panel.get("id") if active_panel else None
 
-    if not panels:
-        await callback.message.edit_text(
-            "🖥 **Список серверов 3x-ui**\n\nСерверы пока не добавлены.",
-            reply_markup=keyboards.main_menu_kb(has_creds=False),
-            parse_mode="Markdown"
-        )
-        await callback.answer()
-        return
+    title = t("panels_list_title", lang)
+    select_lbl = t("select_server_to_switch", lang)
 
-    text = (
-        "🖥 **Список подключенных серверов 3x-ui**\n\n"
-        "Выберите сервер для переключения управления:"
-    )
+    text = f"{title}\n\n{select_lbl}"
     await callback.message.edit_text(
         text,
-        reply_markup=keyboards.panels_list_kb(panels, active_id),
+        reply_markup=keyboards.panels_list_kb(panels, active_id, lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
