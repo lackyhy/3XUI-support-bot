@@ -8,16 +8,22 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Основн�
             InlineKeyboardButton(text=f"🖥 Сервер: {active_panel_name}", callback_data="menu_select_panel")
         ])
         buttons.append([
-            InlineKeyboardButton(text="📊 Статус сервера", callback_data="menu_server"),
-            InlineKeyboardButton(text="👥 Список клиентов", callback_data="menu_all_clients_0")
+            InlineKeyboardButton(text="📊 Статус сервера", callback_data="menu_server")
         ])
         buttons.append([
-            InlineKeyboardButton(text="🌐 Инбаунды (Подключения)", callback_data="menu_inbounds"),
-            InlineKeyboardButton(text="➕ Добавить клиента", callback_data="menu_add_client")
+            InlineKeyboardButton(text="👥 Список всех клиентов", callback_data="menu_all_clients_0")
         ])
         buttons.append([
-            InlineKeyboardButton(text="🔍 Поиск клиента", callback_data="menu_search_client"),
-            InlineKeyboardButton(text="⚡ Перезапустить Xray", callback_data="action_restart_xray")
+            InlineKeyboardButton(text="🌐 Инбаунды (Подключения)", callback_data="menu_inbounds")
+        ])
+        buttons.append([
+            InlineKeyboardButton(text="➕ Добавить нового клиента", callback_data="menu_add_client")
+        ])
+        buttons.append([
+            InlineKeyboardButton(text="🔍 Поиск клиента", callback_data="menu_search_client")
+        ])
+        buttons.append([
+            InlineKeyboardButton(text="⚡ Перезапустить Xray Core", callback_data="action_restart_xray")
         ])
         buttons.append([
             InlineKeyboardButton(text="⚙️ Настройки доступа", callback_data="menu_settings")
