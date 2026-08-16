@@ -1,36 +1,37 @@
 from typing import List, Dict, Any, Tuple, Optional
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Основной сервер") -> InlineKeyboardMarkup:
+def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server", lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    from core.i18n import t
     buttons = []
     if has_creds:
         buttons.append([
-            InlineKeyboardButton(text=f"🖥 Сервер: {active_panel_name}", callback_data="menu_select_panel")
+            InlineKeyboardButton(text=t("btn_active_server", lang, name=active_panel_name), callback_data="menu_select_panel")
         ])
         buttons.append([
-            InlineKeyboardButton(text="📊 Статус сервера", callback_data="menu_server")
+            InlineKeyboardButton(text=t("btn_server_status", lang), callback_data="menu_server")
         ])
         buttons.append([
-            InlineKeyboardButton(text="👥 Клиенты", callback_data="menu_clients_hub")
+            InlineKeyboardButton(text=t("btn_clients", lang), callback_data="menu_clients_hub")
         ])
         buttons.append([
-            InlineKeyboardButton(text="🌐 Инбаунды (Подключения)", callback_data="menu_inbounds")
+            InlineKeyboardButton(text=t("btn_inbounds", lang), callback_data="menu_inbounds")
         ])
         buttons.append([
-            InlineKeyboardButton(text="➕ Добавить нового клиента", callback_data="menu_add_client")
+            InlineKeyboardButton(text=t("btn_add_client", lang), callback_data="menu_add_client")
         ])
         buttons.append([
-            InlineKeyboardButton(text="🔍 Поиск клиента", callback_data="menu_search_client")
+            InlineKeyboardButton(text=t("btn_search_client", lang), callback_data="menu_search_client")
         ])
         buttons.append([
-            InlineKeyboardButton(text="⚡ Перезапустить Xray Core", callback_data="action_restart_xray")
+            InlineKeyboardButton(text=t("btn_restart_xray", lang), callback_data="action_restart_xray")
         ])
         buttons.append([
-            InlineKeyboardButton(text="⚙️ Настройки доступа", callback_data="menu_settings")
+            InlineKeyboardButton(text=t("btn_settings", lang), callback_data="menu_settings")
         ])
     else:
         buttons.append([
-            InlineKeyboardButton(text="⚙️ Подключить панель 3x-ui", callback_data="setup_panel")
+            InlineKeyboardButton(text=t("btn_setup_panel", lang), callback_data="setup_panel")
         ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

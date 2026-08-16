@@ -8,27 +8,37 @@ from keyboards import inline as keyboards
 
 router = Router()
 
+from core import bot_settings
+from core.i18n import t
+
 def get_main_menu_markup():
     has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
-    name = active_panel.get("name", "Основной сервер") if active_panel else "Без сервера"
-    return keyboards.main_menu_kb(has_creds=has_creds, active_panel_name=name)
+    name = active_panel.get("name", "Main Server") if active_panel else "No Server"
+    lang = bot_settings.get_language()
+    return keyboards.main_menu_kb(has_creds=has_creds, active_panel_name=name, lang=lang)
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
+    lang = bot_settings.get_language()
     
-    text = (
-        "🔐 **Панель управления 3x-ui Bot**\n\n"
-        "Приветствую, Администратор!\n"
-    )
-    if has_creds and active_panel:
-        panel_name = active_panel.get("name", "Сервер")
-        text += f"Активный сервер: **{panel_name}**\nВыберите нужный раздел в меню ниже:"
+    if lang == "en":
+        text = "🔐 **3x-ui Bot Management Panel**\n\nWelcome, Administrator!\n"
+        if has_creds and active_panel:
+            panel_name = active_panel.get("name", "Server")
+            text += f"Active server: **{panel_name}**\nSelect a section from the menu below:"
+        else:
+            text += "❌ **No panel credentials configured yet.**\nClick the button below to connect your first panel."
     else:
-        text += "❌ **Данные панелей еще не заданы.**\nНажмите кнопку ниже, чтобы добавить первую панель."
+        text = "🔐 **Панель управления 3x-ui Bot**\n\nПриветствую, Администратор!\n"
+        if has_creds and active_panel:
+            panel_name = active_panel.get("name", "Сервер")
+            text += f"Активный сервер: **{panel_name}**\nВыберите нужный раздел в меню ниже:"
+        else:
+            text += "❌ **Данные панелей еще не заданы.**\nНажмите кнопку ниже, чтобы добавить первую панель."
 
     await message.answer(
         text,
@@ -41,12 +51,14 @@ async def cb_menu_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
+    lang = bot_settings.get_language()
     
-    panel_name = active_panel.get("name", "Сервер") if active_panel else "Нет подключения"
-    text = (
-        "🔐 **Главное меню управления 3x-ui**\n\n"
-        f"Текущий сервер: **{panel_name}**\nВыберите действие:"
-    )
+    panel_name = active_panel.get("name", "Server") if active_panel else ("No connection" if lang == "en" else "Нет подключения")
+    title = t("main_menu_title", lang)
+    cur_lbl = t("current_server", lang)
+    act_lbl = t("choose_action", lang)
+
+    text = f"{title}\n\n{cur_lbl} **{panel_name}**\n{act_lbl}"
     await callback.message.edit_text(
         text,
         reply_markup=get_main_menu_markup(),
