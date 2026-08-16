@@ -67,9 +67,14 @@ async def cb_view_inbound(callback: CallbackQuery):
         await callback.message.edit_text("❌ Инбаунд не найден.", reply_markup=keyboards.main_menu_kb())
         return
 
+    from core import crypto_storage
+    active_panel = crypto_storage.get_active_panel()
+    server_name = active_panel.get("name", "—") if active_panel else "—"
+
     remark = inbound.get("remark", f"Inbound #{inbound_id}")
     protocol = inbound.get("protocol", "").upper()
     port = inbound.get("port")
+    listen = inbound.get("listen") or "0.0.0.0 (Все интерфейсы)"
     enable = "🟢 Включен" if inbound.get("enable", True) else "🔴 Отключен"
     up = format_bytes(inbound.get("up", 0))
     down = format_bytes(inbound.get("down", 0))
@@ -84,13 +89,52 @@ async def cb_view_inbound(callback: CallbackQuery):
     net = stream_settings.get("network", "tcp")
     sec = stream_settings.get("security", "none")
 
+    # Extended Security & Stream Details (Target, uTLS, Xver, SNI)
+    target = "—"
+    utls = "—"
+    xver = "—"
+    sni_str = "—"
+
+    if sec == "reality":
+        real_set = ensure_dict(stream_settings.get("realitySettings"))
+        target = real_set.get("target") or "—"
+        xver = str(real_set.get("xver", 0))
+        inner_set = ensure_dict(real_set.get("settings"))
+        utls = inner_set.get("fingerprint") or "—"
+        server_names = real_set.get("serverNames", [])
+        if server_names:
+            first_sni = server_names[0]
+            sni_str = f"`{first_sni}` (+{len(server_names)-1} доменов)" if len(server_names) > 1 else f"`{first_sni}`"
+    elif sec == "tls":
+        tls_set = ensure_dict(stream_settings.get("tlsSettings"))
+        utls = tls_set.get("fingerprint") or "—"
+        target = tls_set.get("serverName") or "—"
+        if target != "—":
+            sni_str = f"`{target}`"
+
+    # Sniffing Details
+    sniffing = ensure_dict(inbound.get("sniffing"))
+    sniff_enabled = "🟢 Включен" if sniffing.get("enabled", True) else "🔴 Выключен"
+    dest_override = sniffing.get("destOverride") or []
+    dest_str = ", ".join([str(d).upper() for d in dest_override]) if dest_override else "—"
+    meta_only = "🟢 ДА" if sniffing.get("metadataOnly") else "⚪ НЕТ"
+    route_only = "🟢 ДА" if sniffing.get("routeOnly") else "⚪ НЕТ"
+
     text = (
         f"🌐 **Инбаунд: {remark}**\n\n"
-        f"🆔 **ID:** `{inbound_id}`\n"
-        f"Статус: {enable}\n"
-        f"🛠 **Протокол:** `{protocol}`\n"
-        f"🔌 **Порт:** `{port}`\n"
+        f"🖥 **Сервер:** `{server_name}`\n"
+        f"🌐 **Узел (Listen):** `{listen}`\n"
+        f"🆔 **ID:** `{inbound_id}` | Status: **{enable}**\n"
+        f"🛠 **Протокол:** `{protocol}` (Port: `{port}`)\n"
         f"🌐 **Сеть / Защита:** `{net}` / `{sec}`\n\n"
+        f"🎯 **Target (Dest):** `{target}`\n"
+        f"🔑 **uTLS (Fingerprint):** `{utls}`\n"
+        f"⚡ **PROXY Protocol (Xver):** `{xver}`\n"
+        f"🌐 **SNI (ServerNames):** {sni_str}\n\n"
+        f"🔍 **Sniffing (Сниффинг):** {sniff_enabled}\n"
+        f"   • **Перехват:** `{dest_str}`\n"
+        f"   • **Metadata only:** {meta_only}\n"
+        f"   • **Route only:** {route_only}\n\n"
         f"📊 **Трафик:** ⬆️ {up} | ⬇️ {down} | 📈 Всего: `{total}`\n"
         f"👥 **Клиенты:** Всего: **{len(clients)}** (Активных: **{active_clients}**)\n"
     )
