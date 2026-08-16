@@ -121,6 +121,16 @@ async def cb_server_status(callback: CallbackQuery):
     mem_used = mem_obj.get("current", 0)
     ram_str = f"{format_bytes(mem_used)}/{format_bytes(mem_total)}" if mem_total else "N/A"
 
+    # Disk Usage
+    disk_obj = obj.get("disk", {}) if isinstance(obj.get("disk"), dict) else {}
+    disk_total = disk_obj.get("total", 0)
+    disk_used = disk_obj.get("current", 0)
+    if disk_total:
+        disk_pct = int((disk_used / disk_total) * 100)
+        disk_str = f"{format_bytes(disk_used)} / {format_bytes(disk_total)} ({disk_pct}%)"
+    else:
+        disk_str = "N/A"
+
     # Connections & Online Clients
     online_count = obj.get("onlineCount", 0)
     tcp_count = obj.get("tcpCount", 0)
@@ -150,6 +160,7 @@ async def cb_server_status(callback: CallbackQuery):
         f"⏳ **Время работы сервера:** `{uptime_str}`\n"
         f"📈 **Нагрузка сервера:** `{load_str}`\n"
         f"📋 **ОЗУ сервера:** `{ram_str}`\n"
+        f"💾 **Диск сервера:** `{disk_str}`\n"
         f"🌐 **Клиентов онлайн:** `{online_count}`\n"
         f"🔹 **Количество TCP-соединений:** `{tcp_count}`\n"
         f"🔸 **Количество UDP-соединений:** `{udp_count}`\n"
