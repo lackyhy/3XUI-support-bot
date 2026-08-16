@@ -67,6 +67,7 @@ def panels_list_kb(panels: List[Dict[str, Any]], active_id: Optional[str], lang:
         InlineKeyboardButton(text=btn_toggle, callback_data="menu_toggle_panels"),
         InlineKeyboardButton(text=t("btn_delete_server", cur_lang), callback_data="menu_delete_panel")
     ])
+    buttons.append([InlineKeyboardButton(text=t("btn_settings", cur_lang), callback_data="menu_bot_dashboard")])
     buttons.append([InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -144,13 +145,11 @@ def bot_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
 
 def server_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
     cur_lang = lang or "en"
-    btn_bot_menu = "⚙️ Bot Menu (/menu)" if cur_lang == "en" else "⚙️ Настройки доступа (/menu)"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text=t("btn_refresh", cur_lang), callback_data="menu_server"),
             InlineKeyboardButton(text=t("btn_restart_xray", cur_lang), callback_data="action_restart_xray")
         ],
-        [InlineKeyboardButton(text=btn_bot_menu, callback_data="menu_bot_dashboard")],
         [InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")]
     ])
 
