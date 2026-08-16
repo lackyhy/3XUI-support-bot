@@ -379,17 +379,17 @@ async def process_export_credentials(event):
 
     key_str = config.ENCRYPTION_KEY or "—"
     caption = (
-        "📦 **Бэкап зашифрованной базы панелей 3x-ui**\n\n"
-        f"🔑 **Ключ шифрования (ENCRYPTION_KEY):**\n`{key_str}`\n\n"
-        "ℹ️ Для восстановления на другом сервере отправьте этот файл боту и укажите этот ключ в подписи!"
+        "📦 <b>Бэкап зашифрованной базы панелей 3x-ui</b>\n\n"
+        f"🔑 <b>Ключ шифрования (ENCRYPTION_KEY):</b>\n<code>{key_str}</code>\n\n"
+        "ℹ️ Для восстановления просто отправьте этот файл боту и укажите этот ключ в подписи к файлу!"
     )
 
     doc = FSInputFile(config.CREDENTIALS_FILE, filename="credentials.enc")
     if isinstance(event, CallbackQuery):
         await event.answer("Отправка бэкапа...")
-        await event.message.answer_document(doc, caption=caption, parse_mode="Markdown")
+        await event.message.answer_document(doc, caption=caption, parse_mode="HTML")
     else:
-        await event.answer_document(doc, caption=caption, parse_mode="Markdown")
+        await event.answer_document(doc, caption=caption, parse_mode="HTML")
 
 # BOT MENU & MULTI-PANEL DASHBOARD (/menu)
 import asyncio
