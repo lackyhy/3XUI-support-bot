@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from core import crypto_storage
 from keyboards import inline as keyboards
 from states.states import PanelSetupStates, RenamePanelStates
-from core.api_client import ThreeXUIClient
+from core.api_client import ThreeXUIClient, format_bytes
 
 router = Router()
 
@@ -412,6 +412,8 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
     total_count = len(enabled_panels)
     online_count = 0
     offline_count = 0
+    total_up = 0
+    total_down = 0
     panel_status_lines = []
 
     if not panels:
@@ -422,30 +424,50 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
             p_name = p.get("name", "Server")
             client = ThreeXUIClient.from_storage(p_id)
             if not client:
-                return (p_name, False, "Auth failed")
+                return (p_name, False, "Auth failed", 0, 0)
             try:
-                res = await asyncio.wait_for(client.get_inbounds(), timeout=4.0)
-                await client.close()
+                res = await asyncio.wait_for(client.get_sys_status(), timeout=4.0)
+                up_b = 0
+                down_b = 0
                 if res.get("success"):
-                    inbounds_cnt = len(res.get("obj", []))
-                    return (p_name, True, f"{inbounds_cnt} inbounds")
+                    obj = res.get("obj", {})
+                    net_traffic = obj.get("netTraffic") if isinstance(obj.get("netTraffic"), dict) else {}
+                    if net_traffic and ("sent" in net_traffic or "recv" in net_traffic):
+                        up_b = net_traffic.get("sent", 0)
+                        down_b = net_traffic.get("recv", 0)
+                    else:
+                        net_io = obj.get("netIO") if isinstance(obj.get("netIO"), dict) else {}
+                        up_b = net_io.get("up", 0) or net_io.get("sent", 0)
+                        down_b = net_io.get("down", 0) or net_io.get("recv", 0)
+
+                inb_res = await asyncio.wait_for(client.get_inbounds(), timeout=4.0)
+                await client.close()
+                if inb_res.get("success"):
+                    inbounds_cnt = len(inb_res.get("obj", []))
+                    if up_b == 0 and down_b == 0:
+                        for inb in inb_res.get("obj", []):
+                            up_b += inb.get("up", 0)
+                            down_b += inb.get("down", 0)
+                    return (p_name, True, f"{inbounds_cnt} inbounds", up_b, down_b)
                 else:
-                    return (p_name, False, res.get("msg", "Error"))
+                    return (p_name, False, inb_res.get("msg", "Error"), up_b, down_b)
             except Exception:
                 try:
                     await client.close()
                 except Exception:
                     pass
-                return (p_name, False, "Connection Timeout")
+                return (p_name, False, "Connection Timeout", 0, 0)
 
         tasks = [check_panel(p) for p in enabled_panels]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for res in results:
             if isinstance(res, tuple):
-                name, is_online, detail = res
+                name, is_online, detail, up_b, down_b = res
                 if is_online:
                     online_count += 1
+                    total_up += up_b
+                    total_down += down_b
                     panel_status_lines.append(f"• 🟢 **{name}** — `{detail}`")
                 else:
                     offline_count += 1
@@ -460,12 +482,16 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
     total_panels_count = len(panels)
     lang_display = "English 🇬🇧" if lang == "en" else "Русский 🇷🇺"
 
+    total_traffic_bytes = total_up + total_down
+    traffic_summary_str = f"`{format_bytes(total_traffic_bytes)}` (↑`{format_bytes(total_up)}`, ↓`{format_bytes(total_down)}`)"
+
     if lang == "en":
         status_summary = f"🟢 Online: `{online_count}` | 🔴 Offline: `{offline_count}` | ⚪ Disabled: `{disabled_count}`" if total_panels_count > 0 else "—"
         text = (
             f"🤖 **Bot Settings & Multi-Panel Dashboard**\n\n"
             f"🖥 **Total Panels:** `{total_panels_count}`\n"
             f"📊 **Panels Health:** {status_summary}\n"
+            f"🚦 **Total Traffic (Active):** {traffic_summary_str}\n"
             f"🟢 **Active Server:** `{active_name}`\n"
             f"🌐 **Bot Proxy:** `{bot_proxy_str}`\n"
             f"🗣 **Interface Language:** `{lang_display}`\n\n"
@@ -479,7 +505,8 @@ async def render_bot_menu_dashboard() -> Tuple[str, str]:
             f"🤖 **Настройки бота и Мониторинг панелей**\n\n"
             f"🖥 **Всего панелей:** `{total_panels_count}`\n"
             f"📊 **Статус панелей:** {status_summary}\n"
-            f"🟢 **Активный сервер:** `{active_name}`\n"
+            f"🚦 **Суммарный трафик (Активные):** {traffic_summary_str}\n"
+            f"🟢 **Текущий сервер:** `{active_name}`\n"
             f"🌐 **Прокси бота:** `{bot_proxy_str}`\n"
             f"🗣 **Язык интерфейса:** `{lang_display}`\n\n"
             f"📋 **Состояние подключенных панелей:**\n"
