@@ -9,6 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from core.api_client import ThreeXUIClient, format_bytes
 from core import bot_settings
 from core.i18n import t
+from core.geoip import get_ip_geo, format_ipv4_with_2ip
 from keyboards import inline as keyboards
 
 router = Router()
@@ -104,6 +105,9 @@ async def cb_server_status(callback: CallbackQuery):
     if not ipv6 or ipv6 == "None":
         ipv6 = "N/A"
 
+    flag, _ = await get_ip_geo(ipv4)
+    ipv4_str = format_ipv4_with_2ip(ipv4, flag)
+
     # Versions
     xui_version = resolve_xui_version(obj)
     xray_obj = obj.get("xray", {}) if isinstance(obj.get("xray"), dict) else {}
@@ -161,7 +165,7 @@ async def cb_server_status(callback: CallbackQuery):
         f"{t('hostname', lang)} `{hostname}`\n"
         f"{t('xui_ver', lang)} `{xui_version}`\n"
         f"{t('xray_ver', lang)} `{xray_version}`\n"
-        f"🌐 **IPv4:** `{ipv4}`\n"
+        f"🌐 **IPv4:** {ipv4_str}\n"
         f"🌐 **IPv6:** `{ipv6}`\n"
         f"{t('server_uptime', lang)} `{uptime_str}`\n"
         f"{t('server_load', lang)} `{load_str}`\n"
@@ -239,8 +243,8 @@ async def fetch_single_panel_status_card(p: dict, index: int, total: int, lang: 
     parsed_host = urllib.parse.urlparse(client.host)
     ipv4 = public_ip_obj.get("ipv4") or obj.get("ipv4") or parsed_host.hostname or "N/A"
     ipv6 = public_ip_obj.get("ipv6") or obj.get("ipv6") or "N/A"
-    if not ipv6 or ipv6 == "None":
-        ipv6 = "N/A"
+    flag, _ = await get_ip_geo(ipv4)
+    ipv4_str = format_ipv4_with_2ip(ipv4, flag)
 
     xui_version = resolve_xui_version(obj)
     xray_obj = obj.get("xray", {}) if isinstance(obj.get("xray"), dict) else {}
@@ -294,7 +298,7 @@ async def fetch_single_panel_status_card(p: dict, index: int, total: int, lang: 
         f"{t('hostname', lang)} `{hostname}`\n"
         f"{t('xui_ver', lang)} `{xui_version}`\n"
         f"{t('xray_ver', lang)} `{xray_version}`\n"
-        f"🌐 **IPv4:** `{ipv4}`\n"
+        f"🌐 **IPv4:** {ipv4_str}\n"
         f"🌐 **IPv6:** `{ipv6}`\n"
         f"{t('server_uptime', lang)} `{uptime_str}`\n"
         f"{t('server_load', lang)} `{load_str}`\n"
