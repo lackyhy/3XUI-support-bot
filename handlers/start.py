@@ -50,7 +50,28 @@ async def cmd_start(message: Message, state: FSMContext):
 @router.callback_query(F.data == "menu_main")
 async def cb_menu_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await cb_menu_select_panel(callback)
+    has_creds = crypto_storage.has_credentials()
+    active_panel = crypto_storage.get_active_panel()
+    lang = bot_settings.get_language()
+    
+    panel_name = active_panel.get("name", "Server") if active_panel else ("No connection" if lang == "en" else "Нет подключения")
+    title = t("main_menu_title", lang)
+    cur_lbl = t("current_server", lang)
+    act_lbl = t("choose_action", lang)
+
+    text = f"{title}\n\n{cur_lbl} **{panel_name}**\n{act_lbl}"
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=get_main_menu_markup(),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            raise e
+    await callback.answer()
 
 # MULTI-PANEL SWITCHING MENU
 @router.callback_query(F.data == "menu_select_panel")
