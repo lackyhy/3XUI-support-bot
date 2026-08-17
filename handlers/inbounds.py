@@ -70,7 +70,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     lines = []
 
     if proto_upper in ["VLESS", "VMESS", "TROJAN"]:
-        lines.append(f"🌐 **Network / Security:** `{net}` / `{sec}`")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
         if sec == "reality":
             real_set = ensure_dict(stream_settings.get("realitySettings"))
             target = real_set.get("target") or "—"
@@ -125,7 +125,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     elif proto_upper == "SHADOWSOCKS":
         method = settings.get("method") or settings.get("cipher") or "—"
         passwd = settings.get("password") or "—"
-        lines.append(f"🌐 **Network / Security:** `{net}` / `{sec}`")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
         lines.append(f"🔑 **Cipher / Method:** `{method}`")
         if passwd != "—":
             lines.append(f"🔒 **Password:** `{passwd}`")
@@ -155,7 +155,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
     else:
-        lines.append(f"🌐 **Network / Security:** `{net}` / `{sec}`")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
 
     return "\n".join(lines)
 
