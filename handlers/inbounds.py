@@ -77,6 +77,122 @@ async def cb_view_inbound(callback: CallbackQuery):
     active_panel = crypto_storage.get_active_panel()
     server_name = active_panel.get("name", "—") if active_panel else "—"
 
+def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
+    proto_upper = protocol.upper()
+    settings = ensure_dict(inbound.get("settings"))
+    stream_settings = ensure_dict(inbound.get("streamSettings"))
+    net = stream_settings.get("network", "tcp")
+    sec = stream_settings.get("security", "none")
+
+    lines = []
+
+    if proto_upper in ["VLESS", "VMESS", "TROJAN"]:
+        lines.append(f"🌐 **Network / Security:** `{net}` / `{sec}`")
+        if sec == "reality":
+            real_set = ensure_dict(stream_settings.get("realitySettings"))
+            target = real_set.get("target") or "—"
+            xver = str(real_set.get("xver", 0))
+            inner_set = ensure_dict(real_set.get("settings"))
+            utls = inner_set.get("fingerprint") or "—"
+            server_names = real_set.get("serverNames", [])
+            if server_names:
+                first_sni = server_names[0]
+                dom_word = "domains" if lang == "en" else "доменов"
+                sni_str = f"`{first_sni}` (+{len(server_names)-1} {dom_word})" if len(server_names) > 1 else f"`{first_sni}`"
+            else:
+                sni_str = "—"
+            
+            lines.append(f"🎯 **Target:** `{target}`")
+            lines.append(f"🔑 **uTLS:** `{utls}`")
+            lines.append(f"⚡ **Xver:** `{xver}`")
+            lines.append(f"🌐 **SNI:** {sni_str}")
+
+        elif sec == "tls":
+            tls_set = ensure_dict(stream_settings.get("tlsSettings"))
+            utls = tls_set.get("fingerprint") or "—"
+            sni = tls_set.get("serverName") or "—"
+            alpn = tls_set.get("alpn")
+            alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
+            lines.append(f"🔑 **uTLS:** `{utls}`")
+            lines.append(f"🌐 **SNI:** `{sni}`")
+            if alpn_str != "—":
+                lines.append(f"📜 **ALPN:** `{alpn_str}`")
+
+        if net == "ws":
+            ws_set = ensure_dict(stream_settings.get("wsSettings"))
+            path = ws_set.get("path", "/")
+            headers = ensure_dict(ws_set.get("headers"))
+            host = headers.get("Host", "—")
+            lines.append(f"📁 **WS Path:** `{path}`")
+            if host != "—":
+                lines.append(f"🌐 **WS Host:** `{host}`")
+        elif net == "grpc":
+            grpc_set = ensure_dict(stream_settings.get("grpcSettings"))
+            service_name = grpc_set.get("serviceName", "—")
+            lines.append(f"📡 **gRPC Service:** `{service_name}`")
+        elif net in ["http", "xhttp"]:
+            http_set = ensure_dict(stream_settings.get("httpSettings") or stream_settings.get("xhttpSettings"))
+            path = http_set.get("path", "/")
+            host = http_set.get("host", ["—"])
+            host_str = ", ".join(host) if isinstance(host, list) else str(host)
+            lines.append(f"📁 **HTTP Path:** `{path}`")
+            if host_str != "—":
+                lines.append(f"🌐 **HTTP Host:** `{host_str}`")
+
+    elif proto_upper == "SHADOWSOCKS":
+        method = settings.get("method") or settings.get("cipher") or "—"
+        passwd = settings.get("password") or "—"
+        lines.append(f"🌐 **Network / Security:** `{net}` / `{sec}`")
+        lines.append(f"🔑 **Cipher / Method:** `{method}`")
+        if passwd != "—":
+            lines.append(f"🔒 **Password:** `{passwd}`")
+
+    elif proto_upper in ["DOKODEMO-DOOR", "DOKODEMO"]:
+        addr = settings.get("address", "—")
+        f_port = settings.get("port", "—")
+        f_net = settings.get("network", "tcp,udp")
+        lines.append(f"🎯 **Forward Address:** `{addr}`")
+        lines.append(f"🔌 **Forward Port:** `{f_port}`")
+        lines.append(f"🌐 **Forward Network:** `{f_net}`")
+
+    elif proto_upper in ["SOCKS", "HTTP"]:
+        accounts = settings.get("accounts", [])
+        auth_req = ("🟢 YES" if lang == "en" else "🟢 ДА") if accounts else ("⚪ NO" if lang == "en" else "⚪ НЕТ")
+        lines.append(f"👤 **Auth Required:** {auth_req}")
+        if accounts:
+            usernames = [a.get("user", "") for a in accounts if isinstance(a, dict) and a.get("user")]
+            if usernames:
+                lines.append(f"👥 **Users:** `{', '.join(usernames)}`")
+
+    elif proto_upper == "WIREGUARD":
+        mtu = settings.get("mtu", 1420)
+        pub_key = settings.get("pubKey") or settings.get("publicKey") or "—"
+        lines.append(f"📦 **MTU:** `{mtu}`")
+        if pub_key != "—":
+            lines.append(f"🔑 **Public Key:** `{pub_key}`")
+
+    else:
+        lines.append(f"🌐 **Network / Security:** `{net}` / `{sec}`")
+
+    return "\n".join(lines)
+
+async def render_inbound_card(callback: CallbackQuery, inbound_id: int):
+    client_api = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
+    if not client_api:
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
+        return
+
+    inbound = await client_api.get_inbound(inbound_id)
+    server_info = await client_api.get_server_status()
+    await client_api.close()
+
+    if not inbound:
+        await callback.message.edit_text("❌ Inbound not found." if lang == "en" else "❌ Инбаунд не найден.", reply_markup=keyboards.inbounds_list_kb([], lang=lang))
+        return
+
+    server_name = server_info.get("obj", {}).get("hostname", "3x-ui Server")
     remark = inbound.get("remark", f"Inbound #{inbound_id}")
     protocol = inbound.get("protocol", "").upper()
     port = inbound.get("port")
@@ -91,33 +207,8 @@ async def cb_view_inbound(callback: CallbackQuery):
     clients = settings.get("clients", [])
     active_clients = sum(1 for c in clients if c.get("enable", True))
 
-    stream_settings = ensure_dict(inbound.get("streamSettings"))
-    net = stream_settings.get("network", "tcp")
-    sec = stream_settings.get("security", "none")
-
-    # Extended Security & Stream Details (Target, uTLS, Xver, SNI)
-    target = "—"
-    utls = "—"
-    xver = "—"
-    sni_str = "—"
-
-    if sec == "reality":
-        real_set = ensure_dict(stream_settings.get("realitySettings"))
-        target = real_set.get("target") or "—"
-        xver = str(real_set.get("xver", 0))
-        inner_set = ensure_dict(real_set.get("settings"))
-        utls = inner_set.get("fingerprint") or "—"
-        server_names = real_set.get("serverNames", [])
-        if server_names:
-            first_sni = server_names[0]
-            dom_word = "domains" if lang == "en" else "доменов"
-            sni_str = f"`{first_sni}` (+{len(server_names)-1} {dom_word})" if len(server_names) > 1 else f"`{first_sni}`"
-    elif sec == "tls":
-        tls_set = ensure_dict(stream_settings.get("tlsSettings"))
-        utls = tls_set.get("fingerprint") or "—"
-        target = tls_set.get("serverName") or "—"
-        if target != "—":
-            sni_str = f"`{target}`"
+    # Protocol-specific technical details
+    proto_details = build_protocol_details_text(protocol, inbound, lang)
 
     # Sniffing Details
     sniffing = ensure_dict(inbound.get("sniffing"))
@@ -128,11 +219,6 @@ async def cb_view_inbound(callback: CallbackQuery):
     lbl_server = t("server_label", lang)
     lbl_node = t("node_listen", lang)
     lbl_proto = t("proto_port", lang)
-    lbl_net = t("net_sec", lang)
-    lbl_target = t("target_dest", lang)
-    lbl_utls = t("utls_fp", lang)
-    lbl_xver = t("proxy_xver", lang)
-    lbl_sni = t("sni_names", lang)
     lbl_sniff = t("sniffing_info", lang)
     lbl_sniff_p = t("sniff_protocols", lang)
     lbl_used = t("used_traffic", lang)
@@ -156,11 +242,7 @@ async def cb_view_inbound(callback: CallbackQuery):
         f"{lbl_node} `{listen}`\n"
         f"🆔 **ID:** `{inbound_id}` | Status: **{enable}**\n"
         f"{lbl_proto} `{protocol}` (Port: `{port}`)\n"
-        f"{lbl_net} `{net}` / `{sec}`\n\n"
-        f"{lbl_target} `{target}`\n"
-        f"{lbl_utls} `{utls}`\n"
-        f"{lbl_xver} `{xver}`\n"
-        f"{lbl_sni} {sni_str}\n\n"
+        f"{proto_details}\n\n"
         f"{lbl_sniff} {sniff_enabled}\n"
         f"{sniff_details}\n"
         f"{lbl_used} ⬆️ {up} | ⬇️ {down} | Total: `{total}`\n"
