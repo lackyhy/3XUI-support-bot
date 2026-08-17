@@ -306,7 +306,16 @@ async def cb_view_client(callback: CallbackQuery):
     email = target_client.get("email", "no-name")
     is_enabled = target_client.get("enable", True)
     status_str = t("status_active", lang) if is_enabled else t("status_disabled", lang)
-    group_name = target_client.get("group") if target_client.get("group") else "—"
+    group_name = "—"
+    for ib in inbounds:
+        settings = ensure_dict(ib.get("settings"))
+        clients = settings.get("clients", [])
+        for c in clients:
+            if (c.get("id") == uuid_val) or (c.get("password") == uuid_val) or (c.get("email") == email):
+                grp = c.get("group") or c.get("group_name") or c.get("clientGroup") or c.get("client_group")
+                if grp and str(grp).strip() and str(grp).strip().lower() not in ["—", "-", "none", "null", "undefined"]:
+                    group_name = str(grp).strip()
+                    break
 
     # Search client traffic across inbounds using max to avoid multi-inbound duplication
     used_up = 0
@@ -357,7 +366,7 @@ async def cb_view_client(callback: CallbackQuery):
         f"{lbl_status} **{status_str}**\n\n"
         f"{lbl_attached}\n"
         f"{attached_text}\n\n"
-        f"{lbl_sub} `{sub_url}`\n\n"
+        f"{lbl_sub}\n`{sub_url}`\n\n"
         f"{traffic_str}\n"
         f"{lbl_limit} `{limit_str}`\n"
         f"{lbl_exp} `{expiry_str}`\n"
