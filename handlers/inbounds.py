@@ -84,10 +84,28 @@ def extract_utls(stream_settings: dict) -> str:
 
     return "—"
 
-def extract_tls_versions(stream_settings: dict) -> Optional[str]:
+def extract_tls_versions(stream_settings: dict) -> str:
     tls_set = ensure_dict(stream_settings.get("tlsSettings"))
-    min_v = str(tls_set.get("minVersion") or tls_set.get("min_version") or "").replace("VersionTLS", "").replace("TLS", "").strip()
-    max_v = str(tls_set.get("maxVersion") or tls_set.get("max_version") or "").replace("VersionTLS", "").replace("TLS", "").strip()
+    real_set = ensure_dict(stream_settings.get("realitySettings"))
+    h_set = ensure_dict(stream_settings.get("hysteriaSettings") or stream_settings.get("hysteria2Settings"))
+    
+    inner_tls = ensure_dict(tls_set.get("settings"))
+    inner_real = ensure_dict(real_set.get("settings"))
+    inner_h = ensure_dict(h_set.get("settings"))
+
+    sources = [tls_set, inner_tls, real_set, inner_real, h_set, inner_h, stream_settings]
+
+    min_v = ""
+    max_v = ""
+
+    for s in sources:
+        if not min_v:
+            min_v = str(s.get("minVersion") or s.get("min_version") or s.get("minVer") or "")
+        if not max_v:
+            max_v = str(s.get("maxVersion") or s.get("max_version") or s.get("maxVer") or "")
+
+    min_v = min_v.replace("VersionTLS", "").replace("TLS", "").replace("v", "").strip()
+    max_v = max_v.replace("VersionTLS", "").replace("TLS", "").replace("v", "").strip()
 
     if min_v in ["12", "1.2"]: min_v = "1.2"
     elif min_v in ["13", "1.3"]: min_v = "1.3"
@@ -105,7 +123,8 @@ def extract_tls_versions(stream_settings: dict) -> Optional[str]:
         return f"≥ {min_v}"
     elif max_v:
         return f"≤ {max_v}"
-    return None
+    
+    return "1.2 / 1.3"
 
 def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     proto_upper = protocol.upper()
