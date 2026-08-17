@@ -34,44 +34,80 @@ async def cb_clients_hub(callback: CallbackQuery):
         return
 
     await callback.answer("Loading clients hub..." if lang == "en" else "Загрузка раздела клиентов...")
-    res = await client_api.get_inbounds()
-    await client_api.close()
+    clients_res = await client_api.get_clients_list()
+    if not clients_res.get("success"):
+        res = await client_api.get_inbounds()
+        await client_api.close()
+        if not res.get("success"):
+            await callback.message.edit_text(
+                f"❌ **Error loading data:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
+                reply_markup=keyboards.main_menu_kb(lang=lang),
+                parse_mode="Markdown"
+            )
+            return
+        inbounds = res.get("obj", [])
+        unique_clients = set()
+        for ib in inbounds:
+            settings = ensure_dict(ib.get("settings"))
+            for c in settings.get("clients", []):
+                unique_clients.add(c.get("email", "no-name"))
+        total_clients = len(unique_clients)
+    else:
+        await client_api.close()
+        master_clients = clients_res.get("obj", [])
+        total_clients = len(master_clients)
 
-    if not res.get("success"):
-        await callback.message.edit_text(
-            f"❌ **Error loading data:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.main_menu_kb(lang=lang),
-            parse_mode="Markdown"
-        )
+    text = (
+        f"{t('clients_hub_title', lang)}\n\n"
+        f"{t('total_clients_in_system', lang, count=total_clients)}\n\n"
+        + ("Choose an option below to view all clients or filter by group:" if lang == "en" else "Выберите команду ниже для просмотра всех клиентов или фильтрации по группам:")
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=keyboards.clients_hub_kb(total_clients, lang=lang),
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data == "menu_client_groups")
+async def cb_menu_client_groups(callback: CallbackQuery):
+    client_api = ThreeXUIClient.from_storage()
+    lang = bot_settings.get_language()
+
+    if not client_api:
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    inbounds = res.get("obj", [])
+    await callback.answer("Loading groups..." if lang == "en" else "Загрузка групп...")
+    clients_res = await client_api.get_clients_list()
     unique_clients = {}
 
-    for ib in inbounds:
-        settings = ensure_dict(ib.get("settings"))
-        clients = settings.get("clients", [])
-        for c in clients:
+    if clients_res.get("success") and isinstance(clients_res.get("obj"), list):
+        await client_api.close()
+        for c in clients_res.get("obj", []):
             email = c.get("email", "no-name")
-            grp = c.get("group") or c.get("group_name") or c.get("clientGroup") or c.get("client_group") or "none"
+            grp = c.get("group")
             if not grp or str(grp).strip() == "" or str(grp).lower() in ["none", "null", "undefined", "—", "-"]:
                 grp = "none"
             else:
                 grp = str(grp).strip()
+            unique_clients[email] = grp
+    else:
+        res = await client_api.get_inbounds()
+        await client_api.close()
+        if res.get("success"):
+            for ib in res.get("obj", []):
+                settings = ensure_dict(ib.get("settings"))
+                for c in settings.get("clients", []):
+                    email = c.get("email", "no-name")
+                    grp = c.get("group") or c.get("group_name") or c.get("clientGroup") or c.get("client_group") or "none"
+                    if not grp or str(grp).strip() == "" or str(grp).lower() in ["none", "null", "undefined", "—", "-"]:
+                        grp = "none"
+                    else:
+                        grp = str(grp).strip()
+                    if email not in unique_clients or (unique_clients[email] == "none" and grp != "none"):
+                        unique_clients[email] = grp
 
-            if email not in unique_clients or (unique_clients[email] == "none" and grp != "none"):
-                unique_clients[email] = grp
-
-    total_clients = len(unique_clients)
-    if total_clients == 0:
-        await callback.message.edit_text(
-            "👥 **Client Management Hub**\n\nNo clients found in any inbound." if lang == "en" else "👥 **Раздел клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
-            reply_markup=keyboards.main_menu_kb(lang=lang),
-            parse_mode="Markdown"
-        )
-        return
-
-    # Count clients per group
     group_counts = {}
     for email, grp in unique_clients.items():
         group_counts[grp] = group_counts.get(grp, 0) + 1
@@ -79,14 +115,12 @@ async def cb_clients_hub(callback: CallbackQuery):
     groups_summary = [(grp, count) for grp, count in group_counts.items()]
 
     text = (
-        f"{t('clients_hub_title', lang)}\n\n"
-        f"{t('total_clients_in_system', lang, count=total_clients)}\n\n"
-        f"{t('select_all_or_group', lang)}"
+        "📁 **Client Groups**\n\nSelect a group below to view its clients:" if lang == "en" else "📁 **Группы клиентов**\n\nВыберите группу для просмотра списка клиентов:"
     )
 
     await callback.message.edit_text(
         text,
-        reply_markup=keyboards.clients_hub_kb(groups_summary, total_clients, lang=lang),
+        reply_markup=keyboards.client_groups_list_kb(groups_summary, lang=lang),
         parse_mode="Markdown"
     )
 

@@ -192,27 +192,42 @@ def inbound_detail_kb(inbound_id: int, lang: Optional[str] = None) -> InlineKeyb
         [InlineKeyboardButton(text=t("btn_back_to_inbounds", lang), callback_data="menu_inbounds")]
     ])
 
-def clients_hub_kb(groups_summary: List[Tuple[str, int]], total_clients: int, lang: Optional[str] = None) -> InlineKeyboardMarkup:
+def clients_hub_kb(total_clients: int, lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
+    btn_groups = "📁 Groups" if cur_lang == "en" else "📁 Группы клиентов"
     buttons = [
         [
-            InlineKeyboardButton(text=t("all_clients_btn", lang, count=total_clients), callback_data="menu_all_clients_0")
+            InlineKeyboardButton(text=t("all_clients_btn", cur_lang, count=total_clients), callback_data="menu_all_clients_0")
+        ],
+        [
+            InlineKeyboardButton(text=btn_groups, callback_data="menu_client_groups")
+        ],
+        [
+            InlineKeyboardButton(text=t("btn_add_client", cur_lang), callback_data="menu_add_client"),
+            InlineKeyboardButton(text=t("btn_search_client", cur_lang), callback_data="menu_search_client")
+        ],
+        [
+            InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")
         ]
     ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+def client_groups_list_kb(groups_summary: List[Tuple[str, int]], lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
+    buttons = []
     for g_name, count in groups_summary:
         if g_name != "none":
-            disp_name = t("group_btn", lang, name=g_name, count=count)
+            disp_name = t("group_btn", cur_lang, name=g_name, count=count)
         else:
-            disp_name = t("no_group_btn", lang, count=count)
+            disp_name = t("no_group_btn", cur_lang, count=count)
         buttons.append([
             InlineKeyboardButton(text=disp_name, callback_data=f"menu_group_clients_{g_name}_0")
         ])
 
+    btn_back_hub = "🔙 Back to Hub" if cur_lang == "en" else "🔙 Назад в меню клиентов"
     buttons.append([
-        InlineKeyboardButton(text=t("btn_add_client", lang), callback_data="menu_add_client"),
-        InlineKeyboardButton(text=t("btn_search_client", lang), callback_data="menu_search_client")
+        InlineKeyboardButton(text=btn_back_hub, callback_data="menu_clients_hub")
     ])
-    buttons.append([InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def all_clients_paginated_kb(
