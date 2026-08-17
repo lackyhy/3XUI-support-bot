@@ -1,3 +1,4 @@
+from typing import Optional, Dict, Any, List
 import json
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
@@ -83,6 +84,29 @@ def extract_utls(stream_settings: dict) -> str:
 
     return "—"
 
+def extract_tls_versions(stream_settings: dict) -> Optional[str]:
+    tls_set = ensure_dict(stream_settings.get("tlsSettings"))
+    min_v = str(tls_set.get("minVersion") or tls_set.get("min_version") or "").replace("VersionTLS", "").replace("TLS", "").strip()
+    max_v = str(tls_set.get("maxVersion") or tls_set.get("max_version") or "").replace("VersionTLS", "").replace("TLS", "").strip()
+
+    if min_v in ["12", "1.2"]: min_v = "1.2"
+    elif min_v in ["13", "1.3"]: min_v = "1.3"
+    elif min_v in ["10", "1.0"]: min_v = "1.0"
+    elif min_v in ["11", "1.1"]: min_v = "1.1"
+
+    if max_v in ["12", "1.2"]: max_v = "1.2"
+    elif max_v in ["13", "1.3"]: max_v = "1.3"
+    elif max_v in ["10", "1.0"]: max_v = "1.0"
+    elif max_v in ["11", "1.1"]: max_v = "1.1"
+
+    if min_v and max_v:
+        return min_v if min_v == max_v else f"{min_v} / {max_v}"
+    elif min_v:
+        return f"≥ {min_v}"
+    elif max_v:
+        return f"≤ {max_v}"
+    return None
+
 def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     proto_upper = protocol.upper()
     settings = ensure_dict(inbound.get("settings"))
@@ -118,8 +142,12 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             sni = tls_set.get("serverName") or "—"
             alpn = tls_set.get("alpn")
             alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
+            tls_ver = extract_tls_versions(stream_settings)
+
             lines.append(f"🔑 **uTLS:** `{utls}`")
             lines.append(f"🌐 **SNI:** `{sni}`")
+            if tls_ver:
+                lines.append(f"🔒 **TLS Version:** `{tls_ver}`")
             if alpn_str != "—":
                 lines.append(f"📜 **ALPN:** `{alpn_str}`")
 
@@ -184,8 +212,12 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             sni = tls_set.get("serverName") or "—"
             alpn = tls_set.get("alpn")
             alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
+            tls_ver = extract_tls_versions(stream_settings)
+
             lines.append(f"🔑 **uTLS:** `{utls}`")
             lines.append(f"🌐 **SNI:** `{sni}`")
+            if tls_ver:
+                lines.append(f"🔒 **TLS Version:** `{tls_ver}`")
             if alpn_str != "—":
                 lines.append(f"📜 **ALPN:** `{alpn_str}`")
         elif sec != "none":
