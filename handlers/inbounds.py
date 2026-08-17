@@ -272,14 +272,14 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
     elif proto_upper in ["MTPROTO", "MTP"]:
-        dicts = [settings, stream_settings, ensure_dict(stream_settings.get("settings")), inbound]
+        dicts = [settings, stream_settings, ensure_dict(stream_settings.get("settings"))]
 
-        sni = get_key_from_dicts(dicts, ["sni", "domain", "fakeTls", "fake_tls", "faketls", "host", "serverName"], "www.cloudflare.com")
-        f_ip = get_key_from_dicts(dicts, ["frontingIp", "fronting_ip", "domainFrontingIp", "domain_fronting_ip", "frontingHost", "fronting_host", "ip", "fronting"], "127.0.0.1")
-        f_port = get_key_from_dicts(dicts, ["frontingPort", "fronting_port", "domainFrontingPort", "domain_fronting_port", "port"], "443")
+        sni = get_key_from_dicts(dicts, ["sni", "domain", "fakeTls", "fake_tls", "faketls", "serverName"], "www.cloudflare.com")
+        f_ip = get_key_from_dicts(dicts, ["frontingIp", "fronting_ip", "domainFrontingIp", "domain_fronting_ip", "frontingHost", "fronting_host", "fronting"], "127.0.0.1")
+        f_port = get_key_from_dicts(dicts, ["frontingPort", "fronting_port", "domainFrontingPort", "domain_fronting_port"], "443")
         f_proxy = get_key_from_dicts(dicts, ["frontingProxy", "fronting_proxy", "domainFrontingProxy", "domain_fronting_proxy"], False)
         acc_proxy = get_key_from_dicts(dicts, ["acceptProxy", "accept_proxy", "listenProxy", "listen_proxy"], False)
-        pref_ip = get_key_from_dicts(dicts, ["preferIp", "prefer_ip", "ipPreference", "ip_preference", "domainStrategy", "domain_strategy", "strategy"], "prefer-ipv4")
+        pref_ip = get_key_from_dicts(dicts, ["preferIp", "prefer_ip", "ipPreference", "ip_preference", "domainStrategy", "domain_strategy"], "prefer-ipv4")
         debug_log = get_key_from_dicts(dicts, ["debug", "debugLog", "debug_log", "logDebug", "log_debug"], False)
         max_conn = get_key_from_dicts(dicts, ["maxConnections", "max_connections", "maxClients", "max_clients", "maxUsers", "max_users", "connectionLimit"], 0)
         xray_route = get_key_from_dicts(dicts, ["routingThroughXray", "routing_through_xray", "xrayRouting", "xray_routing", "xray"], False)
