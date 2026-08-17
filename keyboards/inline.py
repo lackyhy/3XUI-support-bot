@@ -221,7 +221,7 @@ def client_groups_list_kb(groups_summary: List[Tuple[str, int]], lang: Optional[
         else:
             disp_name = t("no_group_btn", cur_lang, count=count)
         buttons.append([
-            InlineKeyboardButton(text=disp_name, callback_data=f"menu_grp_clients:{g_name}:0")
+            InlineKeyboardButton(text=disp_name, callback_data=f"mgc:{g_name}:0")
         ])
 
     btn_back_hub = "🔙 Back to Hub" if cur_lang == "en" else "🔙 Назад в меню клиентов"
@@ -242,7 +242,7 @@ def all_clients_paginated_kb(
     start_idx = page * page_size
     end_idx = min(start_idx + page_size, total_clients)
 
-    grp_ctx = group_filter if group_filter else "all"
+    grp_ctx = group_filter[:12] if group_filter else "all"
 
     page_items = items[start_idx:end_idx]
     for item in page_items:
@@ -255,11 +255,11 @@ def all_clients_paginated_kb(
         btn_text = f"{enable_icon} {email} ({summary})" if summary else f"{enable_icon} {email}"
         buttons.append([InlineKeyboardButton(
             text=btn_text,
-            callback_data=f"client_view:{ib_id}:{uuid_val}:{grp_ctx}"
+            callback_data=f"cv:{ib_id}:{uuid_val}:{grp_ctx}"
         )])
 
     # Pagination controls
-    cb_prefix = f"menu_grp_clients:{group_filter}:" if group_filter else "menu_all_clients:"
+    cb_prefix = f"mgc:{group_filter}:" if group_filter else "mac:"
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton(text=t("btn_prev", lang), callback_data=f"{cb_prefix}{page-1}"))

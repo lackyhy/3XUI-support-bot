@@ -124,6 +124,7 @@ async def cb_menu_client_groups(callback: CallbackQuery):
         parse_mode="Markdown"
     )
 
+@router.callback_query(F.data.startswith("mgc:"))
 @router.callback_query(F.data.startswith("menu_grp_clients:"))
 async def cb_menu_group_clients(callback: CallbackQuery):
     parts = callback.data.split(":")
@@ -131,6 +132,7 @@ async def cb_menu_group_clients(callback: CallbackQuery):
     page = int(parts[2])
     await render_all_clients_page(callback, page=page, group_filter=group_filter)
 
+@router.callback_query(F.data.startswith("mac:"))
 @router.callback_query(F.data.startswith("menu_all_clients:"))
 async def cb_menu_all_clients(callback: CallbackQuery):
     parts = callback.data.split(":")
@@ -234,6 +236,7 @@ async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_
     markup = keyboards.all_clients_paginated_kb(items, page=page, group_filter=group_filter, lang=lang)
     await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
 
+@router.callback_query(F.data.startswith("cv:"))
 @router.callback_query(F.data.startswith("client_view:"))
 @router.callback_query(F.data.startswith("client_view_"))
 async def cb_client_detail(callback: CallbackQuery):
