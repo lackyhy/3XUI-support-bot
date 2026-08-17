@@ -272,21 +272,88 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
     elif proto_upper in ["MTPROTO", "MTP"]:
-        dicts = [settings, stream_settings, ensure_dict(stream_settings.get("settings"))]
+        dom_fronting = ensure_dict(settings.get("domainFronting"))
+        
+        sni = (
+            settings.get("fakeTlsDomain") or
+            settings.get("sni") or
+            settings.get("domain") or
+            settings.get("fakeTls") or
+            "www.cloudflare.com"
+        )
 
-        sni = get_key_from_dicts(dicts, ["sni", "domain", "fakeTls", "fake_tls", "faketls", "serverName"], "www.cloudflare.com")
-        f_ip = get_key_from_dicts(dicts, ["frontingIp", "fronting_ip", "domainFrontingIp", "domain_fronting_ip", "frontingHost", "fronting_host", "fronting"], "127.0.0.1")
-        f_port = get_key_from_dicts(dicts, ["frontingPort", "fronting_port", "domainFrontingPort", "domain_fronting_port"], "443")
-        f_proxy = get_key_from_dicts(dicts, ["frontingProxy", "fronting_proxy", "domainFrontingProxy", "domain_fronting_proxy"], False)
-        acc_proxy = get_key_from_dicts(dicts, ["acceptProxy", "accept_proxy", "listenProxy", "listen_proxy"], False)
-        pref_ip = get_key_from_dicts(dicts, ["preferIp", "prefer_ip", "ipPreference", "ip_preference", "domainStrategy", "domain_strategy"], "prefer-ipv4")
-        debug_log = get_key_from_dicts(dicts, ["debug", "debugLog", "debug_log", "logDebug", "log_debug"], False)
-        max_conn = get_key_from_dicts(dicts, ["maxConnections", "max_connections", "maxClients", "max_clients", "maxUsers", "max_users", "connectionLimit"], 0)
-        xray_route = get_key_from_dicts(dicts, ["routingThroughXray", "routing_through_xray", "xrayRouting", "xray_routing", "xray"], False)
-        pub_v4 = get_key_from_dicts(dicts, ["publicIPv4", "public_ipv4", "publicIp4", "public_ip4", "publicIp", "public_ip", "ip4", "externalIPv4", "ipv4"], "—")
-        pub_v6 = get_key_from_dicts(dicts, ["publicIPv6", "public_ipv6", "publicIp6", "public_ip6", "ip6", "externalIPv6", "ipv6"], "—")
-        secret = get_key_from_dicts(dicts, ["secret"])
+        f_ip = (
+            dom_fronting.get("ip") or
+            settings.get("frontingIp") or
+            settings.get("fronting_ip") or
+            settings.get("domainFrontingIp") or
+            "127.0.0.1"
+        )
 
+        f_port = (
+            dom_fronting.get("port") or
+            settings.get("frontingPort") or
+            settings.get("fronting_port") or
+            settings.get("domainFrontingPort") or
+            "443"
+        )
+
+        f_proxy = (
+            dom_fronting.get("proxy") or
+            dom_fronting.get("proxyProtocol") or
+            settings.get("frontingProxy") or
+            settings.get("domainFrontingProxy") or
+            False
+        )
+
+        acc_proxy = (
+            settings.get("acceptProxy") or
+            settings.get("accept_proxy") or
+            False
+        )
+
+        pref_ip = (
+            settings.get("preferIp") or
+            settings.get("prefer_ip") or
+            "prefer-ipv4"
+        )
+
+        debug_log = (
+            settings.get("debugLog") or
+            settings.get("debug") or
+            False
+        )
+
+        max_conn = (
+            settings.get("throttleMaxConnections") or
+            settings.get("maxConnections") or
+            settings.get("maxClients") or
+            0
+        )
+
+        xray_route = (
+            settings.get("routingThroughXray") or
+            settings.get("xrayRouting") or
+            False
+        )
+
+        pub_v4 = (
+            settings.get("publicIpv4") or
+            settings.get("publicIPv4") or
+            settings.get("public_ipv4") or
+            settings.get("publicIp4") or
+            "—"
+        )
+
+        pub_v6 = (
+            settings.get("publicIpv6") or
+            settings.get("publicIPv6") or
+            settings.get("public_ipv6") or
+            settings.get("publicIp6") or
+            "—"
+        )
+
+        secret = settings.get("secret")
         if (sni == "www.cloudflare.com" or not sni) and secret and len(str(secret)) > 32:
             try:
                 sec_str = str(secret)
