@@ -60,6 +60,29 @@ async def cb_view_inbound(callback: CallbackQuery):
     inbound_id = int(callback.data.split("_")[2])
     await render_inbound_card(callback, inbound_id)
 
+def extract_utls(stream_settings: dict) -> str:
+    tls_set = ensure_dict(stream_settings.get("tlsSettings"))
+    fp = tls_set.get("fingerprint") or tls_set.get("utls")
+    if not fp:
+        inner_tls = ensure_dict(tls_set.get("settings"))
+        fp = inner_tls.get("fingerprint") or inner_tls.get("utls")
+    if fp:
+        return str(fp)
+
+    real_set = ensure_dict(stream_settings.get("realitySettings"))
+    fp = real_set.get("fingerprint") or real_set.get("utls")
+    if not fp:
+        inner_real = ensure_dict(real_set.get("settings"))
+        fp = inner_real.get("fingerprint") or inner_real.get("utls")
+    if fp:
+        return str(fp)
+
+    fp = stream_settings.get("fingerprint") or stream_settings.get("utls")
+    if fp:
+        return str(fp)
+
+    return "—"
+
 def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     proto_upper = protocol.upper()
     settings = ensure_dict(inbound.get("settings"))
@@ -71,12 +94,12 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
 
     if proto_upper in ["VLESS", "VMESS", "TROJAN"]:
         lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
+        utls = extract_utls(stream_settings)
+
         if sec == "reality":
             real_set = ensure_dict(stream_settings.get("realitySettings"))
             target = real_set.get("target") or "—"
             xver = str(real_set.get("xver", 0))
-            inner_set = ensure_dict(real_set.get("settings"))
-            utls = inner_set.get("fingerprint") or "—"
             server_names = real_set.get("serverNames", [])
             if server_names:
                 first_sni = server_names[0]
@@ -92,7 +115,6 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
 
         elif sec == "tls":
             tls_set = ensure_dict(stream_settings.get("tlsSettings"))
-            utls = tls_set.get("fingerprint") or "—"
             sni = tls_set.get("serverName") or "—"
             alpn = tls_set.get("alpn")
             alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
@@ -155,9 +177,10 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
         up_mbps = h_set.get("up_mbps") or h_set.get("up")
         down_mbps = h_set.get("down_mbps") or h_set.get("down")
 
+        utls = extract_utls(stream_settings)
+
         if sec == "tls":
             tls_set = ensure_dict(stream_settings.get("tlsSettings"))
-            utls = tls_set.get("fingerprint") or "—"
             sni = tls_set.get("serverName") or "—"
             alpn = tls_set.get("alpn")
             alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
@@ -166,6 +189,8 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             if alpn_str != "—":
                 lines.append(f"📜 **ALPN:** `{alpn_str}`")
         elif sec != "none":
+            if utls != "—":
+                lines.append(f"🔑 **uTLS:** `{utls}`")
             lines.append(f"🔒 **Security:** `{sec}`")
 
         if obfs != "—":
