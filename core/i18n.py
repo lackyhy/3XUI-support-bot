@@ -48,6 +48,11 @@ MESSAGES: Dict[str, Dict[str, str]] = {
 
         # Clients Hub & Lists
         "clients_hub_title": "👥 **Client Management Hub**",
+        "total_clients_in_system": "Total clients in system: **{count}**",
+        "select_all_or_group": "Select All Clients or view by specific group:",
+        "all_clients_btn": "🌐 All Clients ({count})",
+        "group_btn": "📁 Group: {name} ({count})",
+        "no_group_btn": "📂 Without Group ({count})",
         "back_to_hub": "🔙 Back to Categories",
         "clients_list_title": "👥 **3x-ui Clients List ({filter_name})**",
         "unique_users": "Unique users: **{total}** (Active: **{active}**)",

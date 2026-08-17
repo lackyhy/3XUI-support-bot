@@ -123,11 +123,14 @@ def auth_type_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
     ])
 
 def settings_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
+    btn_show_token = "🔑 Show Bearer Token" if cur_lang == "en" else "🔑 Показать Bearer Token"
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=t("btn_rename_panel", lang), callback_data="rename_panel")],
-        [InlineKeyboardButton(text=t("btn_edit_setup", lang), callback_data="setup_panel")],
-        [InlineKeyboardButton(text=t("btn_reset_credentials", lang), callback_data="delete_credentials")],
-        [InlineKeyboardButton(text=t("btn_main_menu", lang), callback_data="menu_main")]
+        [InlineKeyboardButton(text=btn_show_token, callback_data="show_bearer_token")],
+        [InlineKeyboardButton(text=t("btn_rename_panel", cur_lang), callback_data="rename_panel")],
+        [InlineKeyboardButton(text=t("btn_edit_setup", cur_lang), callback_data="setup_panel")],
+        [InlineKeyboardButton(text=t("btn_reset_credentials", cur_lang), callback_data="delete_credentials")],
+        [InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")]
     ])
 
 def bot_menu_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:

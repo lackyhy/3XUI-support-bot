@@ -545,3 +545,36 @@ async def cb_set_language(callback: CallbackQuery):
             pass
         else:
             raise e
+
+@router.callback_query(F.data == "show_bearer_token")
+async def cb_show_bearer_token(callback: CallbackQuery):
+    active_panel = crypto_storage.get_active_panel()
+    lang = bot_settings.get_language()
+
+    if not active_panel:
+        msg = "❌ No active panel configured." if lang == "en" else "❌ Панель не настроена."
+        await callback.answer(msg, show_alert=True)
+        return
+
+    token = active_panel.get("token") or active_panel.get("session") or "N/A"
+    p_name = active_panel.get("name", "Server")
+
+    if lang == "en":
+        text = (
+            f"🔑 <b>Bearer Token ({p_name}):</b>\n\n"
+            f"<code>{token}</code>\n\n"
+            "<i>💡 Tap on the token code above to copy it.</i>"
+        )
+    else:
+        text = (
+            f"🔑 <b>Bearer Token ({p_name}):</b>\n\n"
+            f"<code>{token}</code>\n\n"
+            "<i>💡 Нажмите на токен выше, чтобы скопировать его.</i>"
+        )
+
+    await callback.answer()
+    await callback.message.answer(
+        text,
+        reply_markup=keyboards.cancel_kb(lang=lang),
+        parse_mode="HTML"
+    )

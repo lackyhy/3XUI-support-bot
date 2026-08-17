@@ -129,7 +129,11 @@ async def cb_server_status(callback: CallbackQuery):
     mem_obj = obj.get("mem", {}) if isinstance(obj.get("mem"), dict) else {}
     mem_total = mem_obj.get("total", 0)
     mem_used = mem_obj.get("current", 0)
-    ram_str = f"{format_bytes(mem_used)}/{format_bytes(mem_total)}" if mem_total else "N/A"
+    if mem_total:
+        mem_pct = int((mem_used / mem_total) * 100)
+        ram_str = f"{format_bytes(mem_used)} / {format_bytes(mem_total)} ({mem_pct}%)"
+    else:
+        ram_str = "N/A"
 
     # Disk Usage
     disk_obj = obj.get("disk", {}) if isinstance(obj.get("disk"), dict) else {}
@@ -142,7 +146,26 @@ async def cb_server_status(callback: CallbackQuery):
         disk_str = "N/A"
 
     # Connections & Online Clients
-    online_count = obj.get("onlineCount", 0)
+    onlines_list = []
+    try:
+        onlines_list = await client.get_online_clients()
+    except Exception:
+        pass
+
+    if onlines_list:
+        online_cnt = len(onlines_list)
+        if online_cnt <= 5:
+            online_str = f"{online_cnt} ({', '.join(onlines_list)})"
+        else:
+            online_str = f"{online_cnt} ({', '.join(onlines_list[:5])}...)"
+    else:
+        raw_cnt = obj.get("onlineCount")
+        if raw_cnt is not None and isinstance(raw_cnt, (int, float)):
+            online_cnt = int(raw_cnt)
+        else:
+            online_cnt = 0
+        online_str = str(online_cnt)
+
     tcp_count = obj.get("tcpCount", 0)
     udp_count = obj.get("udpCount", 0)
 
@@ -182,7 +205,7 @@ async def cb_server_status(callback: CallbackQuery):
         f"{t('server_load', lang)} `{load_str}`\n"
         f"{t('server_ram', lang)} `{ram_str}`\n"
         f"{t('server_disk', lang)} `{disk_str}`\n"
-        f"{t('online_clients', lang)} `{online_count}`\n"
+        f"{t('online_clients', lang)} `{online_str}`\n"
         f"{t('tcp_conn', lang)} `{tcp_count}`\n"
         f"{t('udp_conn', lang)} `{udp_count}`\n"
         f"{t('server_traffic', lang)} `{traffic_str}`\n"
@@ -309,7 +332,11 @@ async def fetch_single_panel_status_card(p: dict, index: int, total: int, lang: 
     mem_obj = obj.get("mem", {}) if isinstance(obj.get("mem"), dict) else {}
     mem_total = mem_obj.get("total", 0)
     mem_used = mem_obj.get("current", 0)
-    ram_str = f"{format_bytes(mem_used)} / {format_bytes(mem_total)}" if mem_total else "N/A"
+    if mem_total:
+        mem_pct = int((mem_used / mem_total) * 100)
+        ram_str = f"{format_bytes(mem_used)} / {format_bytes(mem_total)} ({mem_pct}%)"
+    else:
+        ram_str = "N/A"
 
     disk_obj = obj.get("disk", {}) if isinstance(obj.get("disk"), dict) else {}
     disk_total = disk_obj.get("total", 0)
