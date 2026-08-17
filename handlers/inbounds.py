@@ -58,24 +58,7 @@ async def cb_list_inbounds(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("inbound_view_"))
 async def cb_view_inbound(callback: CallbackQuery):
     inbound_id = int(callback.data.split("_")[2])
-    client = ThreeXUIClient.from_storage()
-    lang = bot_settings.get_language()
-
-    if not client:
-        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
-        return
-
-    await callback.answer()
-    inbound = await client.get_inbound(inbound_id)
-    await client.close()
-
-    if not inbound:
-        await callback.message.edit_text("❌ Inbound not found." if lang == "en" else "❌ Инбаунд не найден.", reply_markup=keyboards.main_menu_kb(lang=lang))
-        return
-
-    from core import crypto_storage
-    active_panel = crypto_storage.get_active_panel()
-    server_name = active_panel.get("name", "—") if active_panel else "—"
+    await render_inbound_card(callback, inbound_id)
 
 def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     proto_upper = protocol.upper()
