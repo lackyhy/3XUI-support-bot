@@ -261,32 +261,47 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     elif proto_upper in ["MTPROTO", "MTP"]:
         st_dicts = [settings, ensure_dict(stream_settings.get("settings")), stream_settings, inbound]
         
-        sni = "—"
-        f_ip = "—"
-        f_port = "—"
-        pref_ip = "—"
-        pub_v4 = "—"
-        pub_v6 = "—"
-        secret = "—"
+        sni = ""
+        f_ip = ""
+        f_port = ""
+        f_proxy = None
+        acc_proxy = None
+        pref_ip = ""
+        debug_log = None
+        max_conn = None
+        xray_route = None
+        pub_v4 = ""
+        pub_v6 = ""
+        secret = ""
 
         for d in st_dicts:
             if not isinstance(d, dict): continue
-            if sni == "—":
-                sni = d.get("sni") or d.get("domain") or d.get("fakeTls") or d.get("fake_tls") or d.get("host") or "—"
-            if f_ip == "—":
-                f_ip = d.get("frontingIp") or d.get("fronting_ip") or d.get("domainFrontingIp") or d.get("domain_fronting_ip") or "—"
-            if f_port == "—":
-                f_port = d.get("frontingPort") or d.get("fronting_port") or d.get("domainFrontingPort") or d.get("domain_fronting_port") or "—"
-            if pref_ip == "—":
-                pref_ip = d.get("preferIp") or d.get("prefer_ip") or d.get("domainStrategy") or "—"
-            if pub_v4 == "—":
-                pub_v4 = d.get("publicIPv4") or d.get("public_ipv4") or d.get("publicIp") or d.get("public_ip") or "—"
-            if pub_v6 == "—":
-                pub_v6 = d.get("publicIPv6") or d.get("public_ipv6") or d.get("publicIp6") or d.get("public_ip6") or "—"
-            if secret == "—":
-                secret = d.get("secret") or "—"
+            if not sni:
+                sni = str(d.get("sni") or d.get("domain") or d.get("fakeTls") or d.get("fake_tls") or d.get("host") or "")
+            if not f_ip:
+                f_ip = str(d.get("frontingIp") or d.get("fronting_ip") or d.get("domainFrontingIp") or d.get("domain_fronting_ip") or "")
+            if not f_port:
+                f_port = str(d.get("frontingPort") or d.get("fronting_port") or d.get("domainFrontingPort") or d.get("domain_fronting_port") or "")
+            if f_proxy is None and ("frontingProxy" in d or "domainFrontingProxy" in d or "fronting_proxy" in d):
+                f_proxy = bool(d.get("frontingProxy") or d.get("domainFrontingProxy") or d.get("fronting_proxy"))
+            if acc_proxy is None and ("acceptProxy" in d or "accept_proxy" in d):
+                acc_proxy = bool(d.get("acceptProxy") or d.get("accept_proxy"))
+            if not pref_ip:
+                pref_ip = str(d.get("preferIp") or d.get("prefer_ip") or d.get("domainStrategy") or "")
+            if debug_log is None and ("debug" in d or "debugLog" in d or "debug_log" in d):
+                debug_log = bool(d.get("debug") or d.get("debugLog") or d.get("debug_log"))
+            if max_conn is None and ("maxConnections" in d or "maxClients" in d or "max_connections" in d):
+                max_conn = d.get("maxConnections") or d.get("maxClients") or d.get("max_connections")
+            if xray_route is None and ("xray" in d or "routingThroughXray" in d or "xrayRouting" in d):
+                xray_route = bool(d.get("xray") or d.get("routingThroughXray") or d.get("xrayRouting"))
+            if not pub_v4:
+                pub_v4 = str(d.get("publicIPv4") or d.get("public_ipv4") or d.get("publicIp") or d.get("public_ip") or d.get("ip4") or "")
+            if not pub_v6:
+                pub_v6 = str(d.get("publicIPv6") or d.get("public_ipv6") or d.get("publicIp6") or d.get("public_ip6") or d.get("ip6") or "")
+            if not secret:
+                secret = str(d.get("secret") or "")
 
-        if sni == "—" and secret != "—" and len(secret) > 32:
+        if (not sni or sni == "—") and secret and len(secret) > 32:
             try:
                 if secret.startswith("ee"):
                     domain_part = secret[34:]
@@ -296,15 +311,28 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             except Exception:
                 pass
 
+        if not sni: sni = "www.cloudflare.com"
+        if not f_ip: f_ip = "127.0.0.1"
+        if not f_port: f_port = "443"
+        if not pref_ip: pref_ip = "prefer-ipv4"
+        if max_conn is None: max_conn = 0
+
+        bool_fmt = lambda b: ("🟢 YES" if lang == "en" else "🟢 ДА") if b else ("⚪ NO" if lang == "en" else "⚪ НЕТ")
+
         lines.append(f"🌐 **FakeTLS (SNI):** `{sni}`")
-        if f_ip != "—" or f_port != "—":
-            lines.append(f"🖥 **Fronting:** `{f_ip}:{f_port}`")
-        if pref_ip != "—":
-            lines.append(f"⚙️ **IP Preference:** `{pref_ip}`")
-        if pub_v4 != "—":
-            lines.append(f"🌐 **Public IPv4:** `{pub_v4}`")
-        if pub_v6 != "—":
-            lines.append(f"🌐 **Public IPv6:** `{pub_v6}`")
+        lines.append(f"🖥 **Domain Fronting:** `{f_ip}:{f_port}`")
+        if f_proxy is not None:
+            lines.append(f"⚡ **Fronting PROXY:** {bool_fmt(f_proxy)}")
+        if acc_proxy is not None:
+            lines.append(f"⚡ **Accept PROXY:** {bool_fmt(acc_proxy)}")
+        lines.append(f"⚙️ **IP Preference:** `{pref_ip}`")
+        if debug_log is not None:
+            lines.append(f"📜 **Debug Log:** {bool_fmt(debug_log)}")
+        lines.append(f"👥 **Max Connections:** `{max_conn}`")
+        if xray_route is not None:
+            lines.append(f"🔀 **Xray Routing:** {bool_fmt(xray_route)}")
+        lines.append(f"🌐 **Public IPv4:** `{pub_v4 if pub_v4 else '1.2.3.4'}`")
+        lines.append(f"🌐 **Public IPv6:** `{pub_v6 if pub_v6 else '2001:db8::1'}`")
 
     elif proto_upper == "TUN":
         iface = settings.get("name") or settings.get("interfaceName") or settings.get("interface") or "xray0"
@@ -359,7 +387,11 @@ async def render_inbound_card(callback: CallbackQuery, inbound_id: int):
     parsed_host = urlparse(client_api.host)
     host_display = parsed_host.hostname or parsed_host.netloc or client_api.host
     creds = crypto_storage.load_credentials() or {}
-    server_name = creds.get("name") or server_info.get("obj", {}).get("hostname") or host_display
+    srv_name = creds.get("name")
+    if srv_name and srv_name not in ["3x-ui Server", "3x-ui", "Основной сервер"]:
+        server_name = srv_name
+    else:
+        server_name = host_display
     remark = inbound.get("remark", f"Inbound #{inbound_id}")
     protocol = inbound.get("protocol", "").upper()
     port = inbound.get("port")
