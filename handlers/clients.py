@@ -223,7 +223,7 @@ async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_
         items = all_items
 
     active_count = sum(1 for item in items if item.get("enable", True))
-    filter_disp = group_filter if group_filter else ("All" if lang == "en" else "Все")
+    filter_disp = f"`{group_filter}`" if group_filter else ("All" if lang == "en" else "Все")
 
     text = (
         f"🌐 **{t('clients_list_title', lang, filter_name=filter_disp)}**\n\n"
@@ -234,12 +234,19 @@ async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_
     markup = keyboards.all_clients_paginated_kb(items, page=page, group_filter=group_filter, lang=lang)
     await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
 
+@router.callback_query(F.data.startswith("client_view:"))
 @router.callback_query(F.data.startswith("client_view_"))
 async def cb_client_detail(callback: CallbackQuery):
-    parts = callback.data.split("_")
-    inbound_id = int(parts[2])
-    uuid_val = parts[3]
-    group_filter = parts[4] if len(parts) > 4 else None
+    if ":" in callback.data:
+        parts = callback.data.split(":")
+        inbound_id = int(parts[1])
+        uuid_val = parts[2]
+        group_filter = parts[3] if len(parts) > 3 else None
+    else:
+        parts = callback.data.split("_")
+        inbound_id = int(parts[2])
+        uuid_val = parts[3]
+        group_filter = parts[4] if len(parts) > 4 else None
 
     client_api = ThreeXUIClient.from_storage()
     lang = bot_settings.get_language()
