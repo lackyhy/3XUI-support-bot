@@ -121,11 +121,8 @@ async def cb_view_inbound(callback: CallbackQuery):
 
     # Sniffing Details
     sniffing = ensure_dict(inbound.get("sniffing"))
-    sniff_enabled = t("status_active", lang) if sniffing.get("enabled", True) else t("status_disabled", lang)
-    dest_override = sniffing.get("destOverride") or []
-    dest_str = ", ".join([str(d).upper() for d in dest_override]) if dest_override else "—"
-    meta_only = "🟢 YES" if sniffing.get("metadataOnly") else "⚪ NO" if lang == "en" else ("🟢 ДА" if sniffing.get("metadataOnly") else "⚪ НЕТ")
-    route_only = "🟢 YES" if sniffing.get("routeOnly") else "⚪ NO" if lang == "en" else ("🟢 ДА" if sniffing.get("routeOnly") else "⚪ НЕТ")
+    is_sniff_on = bool(sniffing.get("enabled", False))
+    sniff_enabled = t("status_active", lang) if is_sniff_on else t("status_disabled", lang)
 
     lbl_card = t("inbound_card_title", lang, remark=remark)
     lbl_server = t("server_label", lang)
@@ -140,6 +137,19 @@ async def cb_view_inbound(callback: CallbackQuery):
     lbl_sniff_p = t("sniff_protocols", lang)
     lbl_used = t("used_traffic", lang)
 
+    if is_sniff_on:
+        dest_override = sniffing.get("destOverride") or []
+        dest_str = ", ".join([str(d).upper() for d in dest_override]) if dest_override else "—"
+        meta_only = "🟢 YES" if (sniffing.get("metadataOnly") and lang == "en") else ("🟢 ДА" if sniffing.get("metadataOnly") else ("⚪ NO" if lang == "en" else "⚪ НЕТ"))
+        route_only = "🟢 YES" if (sniffing.get("routeOnly") and lang == "en") else ("🟢 ДА" if sniffing.get("routeOnly") else ("⚪ NO" if lang == "en" else "⚪ НЕТ"))
+        sniff_details = (
+            f"   {lbl_sniff_p} `{dest_str}`\n"
+            f"   • **Metadata only:** {meta_only}\n"
+            f"   • **Route only:** {route_only}\n"
+        )
+    else:
+        sniff_details = ""
+
     text = (
         f"{lbl_card}\n\n"
         f"{lbl_server} `{server_name}`\n"
@@ -152,9 +162,7 @@ async def cb_view_inbound(callback: CallbackQuery):
         f"{lbl_xver} `{xver}`\n"
         f"{lbl_sni} {sni_str}\n\n"
         f"{lbl_sniff} {sniff_enabled}\n"
-        f"   {lbl_sniff_p} `{dest_str}`\n"
-        f"   • **Metadata only:** {meta_only}\n"
-        f"   • **Route only:** {route_only}\n\n"
+        f"{sniff_details}\n"
         f"{lbl_used} ⬆️ {up} | ⬇️ {down} | Total: `{total}`\n"
         f"👥 Clients: Total: **{len(clients)}** (Active: **{active_clients}**)\n"
     )
