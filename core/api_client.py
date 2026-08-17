@@ -246,17 +246,39 @@ class ThreeXUIClient:
 
     async def get_online_clients(self) -> List[str]:
         """
-        Fetches list of active online client emails/identifiers from 3x-ui panel.
+        Fetches list of active online client emails from 3x-ui panel via inbounds clientStats lastOnline timestamp.
         """
+        import time
+        now_ms = time.time() * 1000
+        online_emails = set()
+
+        res = await self.get_inbounds()
+        if res.get("success") and isinstance(res.get("obj"), list):
+            for ib in res["obj"]:
+                c_stats = ib.get("clientStats")
+                if isinstance(c_stats, list):
+                    for c in c_stats:
+                        if isinstance(c, dict):
+                            last_on = c.get("lastOnline", 0)
+                            email = c.get("email")
+                            if last_on and email:
+                                diff_sec = (now_ms - last_on) / 1000
+                                if 0 <= diff_sec <= 300:
+                                    online_emails.add(str(email))
+
+        if online_emails:
+            return list(online_emails)
+
         endpoints = [
             ("POST", "/panel/api/inbounds/onlines"),
             ("POST", "/panel/api/server/onlines"),
             ("GET", "/panel/api/inbounds/onlines")
         ]
         for method, ep in endpoints:
-            res = await self._request(method, ep)
-            if res.get("success") and isinstance(res.get("obj"), list):
-                return [str(item) for item in res["obj"] if item]
+            res_ep = await self._request(method, ep)
+            if res_ep.get("success") and isinstance(res_ep.get("obj"), list):
+                return [str(item) for item in res_ep["obj"] if item]
+
         return []
 
     async def get_inbound(self, inbound_id: int) -> Optional[Dict[str, Any]]:
