@@ -221,7 +221,7 @@ def client_groups_list_kb(groups_summary: List[Tuple[str, int]], lang: Optional[
         else:
             disp_name = t("no_group_btn", cur_lang, count=count)
         buttons.append([
-            InlineKeyboardButton(text=disp_name, callback_data=f"menu_group_clients_{g_name}_0")
+            InlineKeyboardButton(text=disp_name, callback_data=f"menu_grp_clients:{g_name}:0")
         ])
 
     btn_back_hub = "🔙 Back to Hub" if cur_lang == "en" else "🔙 Назад в меню клиентов"
@@ -247,19 +247,19 @@ def all_clients_paginated_kb(
     page_items = items[start_idx:end_idx]
     for item in page_items:
         email = item.get("email", "no-name")
-        ib_id = item.get("first_ib_id")
-        uuid_val = item.get("uuid_val", "")
+        ib_id = item.get("inbound_id", item.get("first_ib_id", 0))
+        uuid_val = item.get("uuid", item.get("uuid_val", ""))
         enable_icon = "🟢" if item.get("enable", True) else "🔴"
         summary = item.get("inbounds_summary", "")
         
         btn_text = f"{enable_icon} {email} ({summary})" if summary else f"{enable_icon} {email}"
         buttons.append([InlineKeyboardButton(
             text=btn_text,
-            callback_data=f"client_view_{ib_id}_{uuid_val}_{grp_ctx}"
+            callback_data=f"client_view:{ib_id}:{uuid_val}:{grp_ctx}"
         )])
 
     # Pagination controls
-    cb_prefix = f"menu_group_clients_{group_filter}_" if group_filter else "menu_all_clients_"
+    cb_prefix = f"menu_grp_clients:{group_filter}:" if group_filter else "menu_all_clients:"
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton(text=t("btn_prev", lang), callback_data=f"{cb_prefix}{page-1}"))
@@ -272,7 +272,8 @@ def all_clients_paginated_kb(
         InlineKeyboardButton(text=t("btn_add_client", lang), callback_data="menu_add_client"),
         InlineKeyboardButton(text=t("btn_search_client", lang), callback_data="menu_search_client")
     ])
-    buttons.append([InlineKeyboardButton(text=t("back_to_hub", lang), callback_data="menu_clients_hub")])
+    back_target = "menu_client_groups" if group_filter else "menu_clients_hub"
+    buttons.append([InlineKeyboardButton(text=t("back_to_hub", lang), callback_data=back_target)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def clients_list_kb(inbound_id: int, clients: List[Dict[str, Any]], page: int = 0, page_size: int = 8, lang: Optional[str] = None) -> InlineKeyboardMarkup:

@@ -124,94 +124,30 @@ async def cb_menu_client_groups(callback: CallbackQuery):
         parse_mode="Markdown"
     )
 
+@router.callback_query(F.data.startswith("menu_grp_clients:"))
+async def cb_menu_group_clients(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    group_filter = parts[1]
+    page = int(parts[2])
+    await render_all_clients_page(callback, page=page, group_filter=group_filter)
+
+@router.callback_query(F.data.startswith("menu_all_clients:"))
+async def cb_menu_all_clients(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    page = int(parts[1])
+    await render_all_clients_page(callback, page=page, group_filter=None)
+
 @router.callback_query(F.data.startswith("menu_group_clients_"))
-async def cb_group_clients(callback: CallbackQuery):
+async def cb_menu_group_clients_legacy(callback: CallbackQuery):
     parts = callback.data.split("_")
-    group_filter = parts[3]
-    page = int(parts[4])
-
-    client_api = ThreeXUIClient.from_storage()
-    lang = bot_settings.get_language()
-
-    if not client_api:
-        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
-        return
-
-    await callback.answer("Loading group clients..." if lang == "en" else "Загрузка клиентов группы...")
-    res = await client_api.get_inbounds()
-    await client_api.close()
-
-    if not res.get("success"):
-        await callback.message.edit_text(
-            f"❌ **Error loading data:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки данных:**\n`{res.get('msg')}`",
-            reply_markup=keyboards.main_menu_kb(lang=lang),
-            parse_mode="Markdown"
-        )
-        return
-
-    inbounds = res.get("obj", [])
-    unique_clients = {}
-
-    for ib in inbounds:
-        ib_id = ib.get("id")
-        ib_remark = ib.get("remark", f"#{ib_id}")
-        settings = ensure_dict(ib.get("settings"))
-        clients = settings.get("clients", [])
-        for c in clients:
-            email = c.get("email", "no-name")
-            grp = c.get("group") or "none"
-            if group_filter != "all" and grp != group_filter:
-                continue
-
-            uuid_val = c.get("id") or c.get("password") or ""
-            enable = c.get("enable", True)
-
-            if email not in unique_clients:
-                unique_clients[email] = {
-                    "email": email,
-                    "first_ib_id": ib_id,
-                    "uuid_val": uuid_val,
-                    "enable": enable,
-                    "group": grp,
-                    "inbounds": [ib_remark]
-                }
-            else:
-                unique_clients[email]["inbounds"].append(ib_remark)
-
-    items = []
-    for email, info in unique_clients.items():
-        ibs = info["inbounds"]
-        summary = ibs[0] if len(ibs) == 1 else f"{ibs[0]} +{len(ibs)-1}"
-        info["inbounds_summary"] = summary
-        items.append(info)
-
-    if group_filter == "none":
-        grp_name = "Without Group" if lang == "en" else "Без группы"
-    else:
-        grp_name = f"Group `{group_filter}`" if lang == "en" else f"Группа `{group_filter}`"
-
-    text = (
-        f"📁 **{t('btn_clients', lang)} — {grp_name}**\n\n"
-        f"Users in group: **{len(items)}**\nSelect a client to manage:" if lang == "en" else f"📁 **Клиенты — {grp_name}**\n\nПользователей в группе: **{len(items)}**\nВыберите клиента для управления:"
-    )
-
-    from aiogram.exceptions import TelegramBadRequest
-    try:
-        await callback.message.edit_text(
-            text,
-            reply_markup=keyboards.all_clients_paginated_kb(items, page, group_filter=group_filter, lang=lang),
-            parse_mode="Markdown"
-        )
-    except TelegramBadRequest as e:
-        if "message is not modified" in str(e):
-            pass
-        else:
-            raise e
+    page = int(parts[-1])
+    group_filter = "_".join(parts[3:-1])
+    await render_all_clients_page(callback, page=page, group_filter=group_filter)
 
 @router.callback_query(F.data.startswith("menu_all_clients_"))
-async def cb_menu_all_clients(callback: CallbackQuery):
+async def cb_menu_all_clients_legacy(callback: CallbackQuery):
     parts = callback.data.split("_")
-    page = int(parts[3])
+    page = int(parts[-1])
     await render_all_clients_page(callback, page=page, group_filter=None)
 
 async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_filter: Optional[str] = None):
