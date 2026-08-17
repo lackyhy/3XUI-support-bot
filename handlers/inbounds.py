@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 import json
 from urllib.parse import urlparse
 from aiogram import Router, F
@@ -128,6 +128,32 @@ def extract_tls_versions(stream_settings: dict) -> str:
     
     return "1.2 / 1.3"
 
+def extract_tls_certs(stream_settings: dict) -> Tuple[Optional[str], Optional[str]]:
+    tls_set = ensure_dict(stream_settings.get("tlsSettings"))
+    h_set = ensure_dict(stream_settings.get("hysteriaSettings") or stream_settings.get("hysteria2Settings"))
+    
+    cert = None
+    key = None
+
+    certs_list = tls_set.get("certificates") or h_set.get("certificates")
+    if isinstance(certs_list, list) and certs_list:
+        c_obj = ensure_dict(certs_list[0])
+        cert = c_obj.get("certFile") or c_obj.get("cert") or c_obj.get("certPath")
+        key = c_obj.get("keyFile") or c_obj.get("key") or c_obj.get("keyPath")
+
+    if not cert:
+        cert = (
+            tls_set.get("certFile") or tls_set.get("cert") or tls_set.get("certPath") or
+            h_set.get("certFile") or h_set.get("cert") or h_set.get("certPath")
+        )
+    if not key:
+        key = (
+            tls_set.get("keyFile") or tls_set.get("key") or tls_set.get("keyPath") or
+            h_set.get("keyFile") or h_set.get("key") or h_set.get("keyPath")
+        )
+
+    return (str(cert).strip() if cert else None, str(key).strip() if key else None)
+
 def get_key_from_dicts(dicts: List[dict], candidates: List[str], default: Any = None) -> Any:
     for d in dicts:
         if not isinstance(d, dict):
@@ -177,6 +203,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             alpn = tls_set.get("alpn")
             alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
             tls_ver = extract_tls_versions(stream_settings)
+            pub_cert, priv_key = extract_tls_certs(stream_settings)
 
             lines.append(f"🔑 **uTLS:** `{utls}`")
             lines.append(f"🌐 **SNI:** `{sni}`")
@@ -184,6 +211,10 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
                 lines.append(f"🔒 **TLS Version:** `{tls_ver}`")
             if alpn_str != "—":
                 lines.append(f"📜 **ALPN:** `{alpn_str}`")
+            if pub_cert:
+                lines.append(f"📜 **Public Cert:** `{pub_cert}`")
+            if priv_key:
+                lines.append(f"🔑 **Private Key:** `{priv_key}`")
 
         if net == "ws":
             ws_set = ensure_dict(stream_settings.get("wsSettings"))
@@ -247,6 +278,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             alpn = tls_set.get("alpn")
             alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
             tls_ver = extract_tls_versions(stream_settings)
+            pub_cert, priv_key = extract_tls_certs(stream_settings)
 
             lines.append(f"🔑 **uTLS:** `{utls}`")
             lines.append(f"🌐 **SNI:** `{sni}`")
@@ -254,10 +286,19 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
                 lines.append(f"🔒 **TLS Version:** `{tls_ver}`")
             if alpn_str != "—":
                 lines.append(f"📜 **ALPN:** `{alpn_str}`")
+            if pub_cert:
+                lines.append(f"📜 **Public Cert:** `{pub_cert}`")
+            if priv_key:
+                lines.append(f"🔑 **Private Key:** `{priv_key}`")
         elif sec != "none":
             if utls != "—":
                 lines.append(f"🔑 **uTLS:** `{utls}`")
             lines.append(f"🔒 **Security:** `{sec}`")
+            pub_cert, priv_key = extract_tls_certs(stream_settings)
+            if pub_cert:
+                lines.append(f"📜 **Public Cert:** `{pub_cert}`")
+            if priv_key:
+                lines.append(f"🔑 **Private Key:** `{priv_key}`")
 
         if obfs != "—":
             lines.append(f"🛡 **Obfs:** `{obfs}`")
