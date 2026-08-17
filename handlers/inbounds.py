@@ -256,6 +256,56 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
         if pub_key != "—":
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
+    elif proto_upper == "MTPROTO":
+        sni = settings.get("sni") or settings.get("domain") or settings.get("fakeTls") or "—"
+        f_ip = settings.get("frontingIp") or settings.get("domainFrontingIp") or "—"
+        f_port = settings.get("frontingPort") or settings.get("domainFrontingPort") or "—"
+        pref_ip = settings.get("preferIp") or settings.get("prefer_ip") or "—"
+        pub_v4 = settings.get("publicIPv4") or settings.get("public_ipv4") or "—"
+        pub_v6 = settings.get("publicIPv6") or settings.get("public_ipv6") or "—"
+        max_conn = settings.get("maxConnections") or settings.get("maxClients") or 0
+
+        lines.append(f"🌐 **FakeTLS (SNI):** `{sni}`")
+        if f_ip != "—" or f_port != "—":
+            lines.append(f"🖥 **Fronting:** `{f_ip}:{f_port}`")
+        if pref_ip != "—":
+            lines.append(f"⚙️ **IP Preference:** `{pref_ip}`")
+        if pub_v4 != "—" or pub_v6 != "—":
+            v46_parts = []
+            if pub_v4 != "—": v46_parts.append(f"`{pub_v4}`")
+            if pub_v6 != "—": v46_parts.append(f"`{pub_v6}`")
+            lines.append(f"🌐 **Public IP:** {' / '.join(v46_parts)}")
+        lines.append(f"👥 **Max Connections:** `{max_conn if max_conn > 0 else '♾️ Unlimited'}`")
+
+    elif proto_upper == "TUN":
+        iface = settings.get("name") or settings.get("interfaceName") or settings.get("interface") or "xray0"
+        mtu = settings.get("mtu", 1500)
+        gw = settings.get("gateway") or settings.get("gateways") or "—"
+        gw_str = ", ".join(gw) if isinstance(gw, list) else str(gw)
+        dns_val = settings.get("dns") or "—"
+        dns_str = ", ".join(dns_val) if isinstance(dns_val, list) else str(dns_val)
+        out_iface = settings.get("outgoing") or settings.get("outgoingInterface") or "auto"
+
+        lines.append(f"🔌 **Interface:** `{iface}`")
+        lines.append(f"📦 **MTU:** `{mtu}`")
+        if gw_str != "—":
+            lines.append(f"🌐 **Gateway:** `{gw_str}`")
+        if dns_str != "—":
+            lines.append(f"📡 **DNS:** `{dns_str}`")
+        lines.append(f"⚙️ **Outgoing Interface:** `{out_iface}`")
+
+    elif proto_upper == "TUNNEL":
+        addr = settings.get("address") or settings.get("rewriteAddress") or settings.get("targetAddress") or "—"
+        r_port = settings.get("port") or settings.get("rewritePort") or settings.get("targetPort") or "—"
+        net_allowed = settings.get("network") or settings.get("allowedNetwork") or "TCP, UDP"
+        redirect = settings.get("followRedirect") or settings.get("redirect") or False
+        redir_str = "🟢 YES" if (redirect and lang == "en") else ("🟢 ДА" if redirect else ("⚪ NO" if lang == "en" else "⚪ НЕТ"))
+
+        lines.append(f"🎯 **Rewrite Address:** `{addr}`")
+        lines.append(f"🔌 **Rewrite Port:** `{r_port}`")
+        lines.append(f"🌐 **Allowed Network:** `{net_allowed}`")
+        lines.append(f"🔀 **Follow Redirect:** {redir_str}")
+
     else:
         lines.append(f"🌐 **Network:** `{net}` / `{sec}`")
 
