@@ -281,6 +281,23 @@ class ThreeXUIClient:
 
         return []
 
+    async def get_clients_list(self) -> Dict[str, Any]:
+        """
+        Fetches the master client database list directly from 3x-ui panel (/panel/api/clients/list).
+        Contains exact client groups, traffic, attached inbounds, and UUIDs.
+        """
+        endpoints = [
+            ("GET", "/panel/api/clients/list"),
+            ("POST", "/panel/api/clients/list"),
+            ("GET", "/panel/api/inbounds/clients/list"),
+            ("POST", "/panel/api/inbounds/clients/list")
+        ]
+        for method, ep in endpoints:
+            res = await self._request(method, ep)
+            if res.get("success") and "obj" in res:
+                return res
+        return {"success": False, "msg": "Client list endpoint not available"}
+
     async def get_inbound(self, inbound_id: int) -> Optional[Dict[str, Any]]:
         res = await self.get_inbounds()
         if res.get("success") and "obj" in res:

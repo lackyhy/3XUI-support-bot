@@ -174,21 +174,23 @@ async def cb_group_clients(callback: CallbackQuery):
             raise e
 
 @router.callback_query(F.data.startswith("menu_all_clients_"))
-async def cb_all_clients(callback: CallbackQuery):
-    page = int(callback.data.split("_")[3])
+async def cb_menu_all_clients(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    page = int(parts[3])
+    await render_all_clients_page(callback, page=page, group_filter=None)
 
-    client_api = ThreeXUIClient.from_storage()
+async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_filter: Optional[str] = None):
     lang = bot_settings.get_language()
+    panel_id = crypto_storage.get_active_panel_id()
+    client_api = ThreeXUIClient.from_storage(panel_id)
 
     if not client_api:
         await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer("Loading all clients..." if lang == "en" else "Загрузка списка всех клиентов...")
     res = await client_api.get_inbounds()
-    await client_api.close()
-
     if not res.get("success"):
+        await client_api.close()
         await callback.message.edit_text(
             f"❌ **Error loading inbounds:**\n`{res.get('msg')}`" if lang == "en" else f"❌ **Ошибка загрузки инбаундов:**\n`{res.get('msg')}`",
             reply_markup=keyboards.main_menu_kb(lang=lang),
@@ -199,74 +201,78 @@ async def cb_all_clients(callback: CallbackQuery):
     inbounds = res.get("obj", [])
     unique_clients = {}
 
-    for ib in inbounds:
-        ib_id = ib.get("id")
-        ib_remark = ib.get("remark", f"#{ib_id}")
-        settings = ensure_dict(ib.get("settings"))
-        clients = settings.get("clients", [])
-        for c in clients:
+    clients_res = await client_api.get_clients_list()
+    await client_api.close()
+
+    if clients_res.get("success") and isinstance(clients_res.get("obj"), list):
+        for c in clients_res.get("obj", []):
             email = c.get("email", "no-name")
-            uuid_val = c.get("id") or c.get("password") or ""
-            enable = c.get("enable", True)
+            uuid_val = c.get("uuid") or c.get("id") or c.get("password") or ""
+            grp = c.get("group")
+            if not grp or str(grp).strip() == "" or str(grp).lower() in ["none", "null", "undefined", "—", "-"]:
+                grp = "none"
+            else:
+                grp = str(grp).strip()
 
             if email not in unique_clients:
                 unique_clients[email] = {
                     "email": email,
-                    "first_ib_id": ib_id,
-                    "uuid_val": uuid_val,
-                    "enable": enable,
-                    "inbounds": [ib_remark]
+                    "uuid": uuid_val,
+                    "enable": c.get("enable", True),
+                    "group": grp,
+                    "inbound_id": c.get("inboundIds", [0])[0] if isinstance(c.get("inboundIds"), list) and c.get("inboundIds") else 0
                 }
-            else:
-                unique_clients[email]["inbounds"].append(ib_remark)
+    else:
+        for ib in inbounds:
+            ib_id = ib.get("id")
+            settings = ensure_dict(ib.get("settings"))
+            clients = settings.get("clients", [])
+            for c in clients:
+                email = c.get("email", "no-name")
+                uuid_val = c.get("id") or c.get("password") or ""
+                enable = c.get("enable", True)
+                grp = c.get("group") or c.get("group_name") or c.get("clientGroup") or c.get("client_group") or "none"
+                if not grp or str(grp).strip() == "" or str(grp).lower() in ["none", "null", "undefined", "—", "-"]:
+                    grp = "none"
+                else:
+                    grp = str(grp).strip()
 
-    if not unique_clients:
-        await callback.message.edit_text(
-            "👥 **All Clients List**\n\nNo clients found." if lang == "en" else "👥 **Список всех клиентов**\n\nКлиентов пока нет ни в одном инбаунде.",
-            reply_markup=keyboards.main_menu_kb(lang=lang),
-            parse_mode="Markdown"
-        )
-        return
+                if email not in unique_clients or (unique_clients[email]["group"] == "none" and grp != "none"):
+                    unique_clients[email] = {
+                        "email": email,
+                        "uuid": uuid_val,
+                        "enable": enable,
+                        "group": grp,
+                        "inbound_id": ib_id
+                    }
 
-    items = []
-    for email, info in unique_clients.items():
-        ibs = info["inbounds"]
-        if len(ibs) == 1:
-            summary = ibs[0]
-        else:
-            summary = f"{ibs[0]} +{len(ibs)-1}"
-        info["inbounds_summary"] = summary
-        items.append(info)
+    all_items = list(unique_clients.values())
+    if group_filter:
+        items = [item for item in all_items if item["group"] == group_filter]
+    else:
+        items = all_items
 
     active_count = sum(1 for item in items if item.get("enable", True))
+    filter_disp = group_filter if group_filter else ("All" if lang == "en" else "Все")
 
     text = (
-        f"🌐 **{t('clients_list_title', lang, filter_name='All')}**\n\n"
+        f"🌐 **{t('clients_list_title', lang, filter_name=filter_disp)}**\n\n"
         f"{t('unique_users', lang, total=len(items), active=active_count)}\n"
         f"{t('select_client_to_manage', lang)}"
     )
 
-    from aiogram.exceptions import TelegramBadRequest
-    try:
-        await callback.message.edit_text(
-            text,
-            reply_markup=keyboards.all_clients_paginated_kb(items, page, lang=lang),
-            parse_mode="Markdown"
-        )
-    except TelegramBadRequest as e:
-        if "message is not modified" in str(e):
-            pass
-        else:
-            raise e
+    markup = keyboards.all_clients_paginated_kb(items, page=page, group_filter=group_filter, lang=lang)
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
 
 @router.callback_query(F.data.startswith("client_view_"))
-async def cb_view_client(callback: CallbackQuery):
+async def cb_client_detail(callback: CallbackQuery):
     parts = callback.data.split("_")
     inbound_id = int(parts[2])
     uuid_val = parts[3]
-    group_filter = parts[4] if len(parts) > 4 else "all"
+    group_filter = parts[4] if len(parts) > 4 else None
 
-    client_api = ThreeXUIClient.from_storage()
+    panel_id = crypto_storage.get_active_panel_id()
+    client_api = ThreeXUIClient.from_storage(panel_id)
     lang = bot_settings.get_language()
 
     if not client_api:
@@ -275,6 +281,7 @@ async def cb_view_client(callback: CallbackQuery):
 
     await callback.answer("Loading profile..." if lang == "en" else "Загрузка профиля...")
     res = await client_api.get_inbounds()
+    clients_res = await client_api.get_clients_list()
     await client_api.close()
 
     if not res.get("success"):
@@ -307,12 +314,11 @@ async def cb_view_client(callback: CallbackQuery):
     is_enabled = target_client.get("enable", True)
     status_str = t("status_active", lang) if is_enabled else t("status_disabled", lang)
     group_name = "—"
-    for ib in inbounds:
-        settings = ensure_dict(ib.get("settings"))
-        clients = settings.get("clients", [])
-        for c in clients:
-            if (c.get("id") == uuid_val) or (c.get("password") == uuid_val) or (c.get("email") == email):
-                grp = c.get("group") or c.get("group_name") or c.get("clientGroup") or c.get("client_group")
+
+    if clients_res.get("success") and isinstance(clients_res.get("obj"), list):
+        for c in clients_res.get("obj", []):
+            if (c.get("uuid") == uuid_val) or (c.get("id") == uuid_val) or (c.get("email") == email):
+                grp = c.get("group")
                 if grp and str(grp).strip() and str(grp).strip().lower() not in ["—", "-", "none", "null", "undefined"]:
                     group_name = str(grp).strip()
                     break
