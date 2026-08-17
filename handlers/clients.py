@@ -52,9 +52,14 @@ async def cb_clients_hub(callback: CallbackQuery):
         clients = settings.get("clients", [])
         for c in clients:
             email = c.get("email", "no-name")
-            group = c.get("group") or "none"
-            if email not in unique_clients:
-                unique_clients[email] = group
+            grp = c.get("group") or c.get("group_name") or c.get("clientGroup") or c.get("client_group") or "none"
+            if not grp or str(grp).strip() == "" or str(grp).lower() in ["none", "null", "undefined", "—", "-"]:
+                grp = "none"
+            else:
+                grp = str(grp).strip()
+
+            if email not in unique_clients or (unique_clients[email] == "none" and grp != "none"):
+                unique_clients[email] = grp
 
     total_clients = len(unique_clients)
     if total_clients == 0:
