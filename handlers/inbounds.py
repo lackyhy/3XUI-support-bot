@@ -256,26 +256,53 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
         if pub_key != "—":
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
-    elif proto_upper == "MTPROTO":
-        sni = settings.get("sni") or settings.get("domain") or settings.get("fakeTls") or "—"
-        f_ip = settings.get("frontingIp") or settings.get("domainFrontingIp") or "—"
-        f_port = settings.get("frontingPort") or settings.get("domainFrontingPort") or "—"
-        pref_ip = settings.get("preferIp") or settings.get("prefer_ip") or "—"
-        pub_v4 = settings.get("publicIPv4") or settings.get("public_ipv4") or "—"
-        pub_v6 = settings.get("publicIPv6") or settings.get("public_ipv6") or "—"
-        max_conn = settings.get("maxConnections") or settings.get("maxClients") or 0
+    elif proto_upper in ["MTPROTO", "MTP"]:
+        st_dicts = [settings, ensure_dict(stream_settings.get("settings")), stream_settings, inbound]
+        
+        sni = "—"
+        f_ip = "—"
+        f_port = "—"
+        pref_ip = "—"
+        pub_v4 = "—"
+        pub_v6 = "—"
+        secret = "—"
+
+        for d in st_dicts:
+            if not isinstance(d, dict): continue
+            if sni == "—":
+                sni = d.get("sni") or d.get("domain") or d.get("fakeTls") or d.get("fake_tls") or d.get("host") or "—"
+            if f_ip == "—":
+                f_ip = d.get("frontingIp") or d.get("fronting_ip") or d.get("domainFrontingIp") or d.get("domain_fronting_ip") or "—"
+            if f_port == "—":
+                f_port = d.get("frontingPort") or d.get("fronting_port") or d.get("domainFrontingPort") or d.get("domain_fronting_port") or "—"
+            if pref_ip == "—":
+                pref_ip = d.get("preferIp") or d.get("prefer_ip") or d.get("domainStrategy") or "—"
+            if pub_v4 == "—":
+                pub_v4 = d.get("publicIPv4") or d.get("public_ipv4") or d.get("publicIp") or d.get("public_ip") or "—"
+            if pub_v6 == "—":
+                pub_v6 = d.get("publicIPv6") or d.get("public_ipv6") or d.get("publicIp6") or d.get("public_ip6") or "—"
+            if secret == "—":
+                secret = d.get("secret") or "—"
+
+        if sni == "—" and secret != "—" and len(secret) > 32:
+            try:
+                if secret.startswith("ee"):
+                    domain_part = secret[34:]
+                    decoded_domain = bytes.fromhex(domain_part).decode("ascii", errors="ignore")
+                    if decoded_domain and "." in decoded_domain:
+                        sni = decoded_domain.strip()
+            except Exception:
+                pass
 
         lines.append(f"🌐 **FakeTLS (SNI):** `{sni}`")
         if f_ip != "—" or f_port != "—":
             lines.append(f"🖥 **Fronting:** `{f_ip}:{f_port}`")
         if pref_ip != "—":
             lines.append(f"⚙️ **IP Preference:** `{pref_ip}`")
-        if pub_v4 != "—" or pub_v6 != "—":
-            v46_parts = []
-            if pub_v4 != "—": v46_parts.append(f"`{pub_v4}`")
-            if pub_v6 != "—": v46_parts.append(f"`{pub_v6}`")
-            lines.append(f"🌐 **Public IP:** {' / '.join(v46_parts)}")
-        lines.append(f"👥 **Max Connections:** `{max_conn if max_conn > 0 else '♾️ Unlimited'}`")
+        if pub_v4 != "—":
+            lines.append(f"🌐 **Public IPv4:** `{pub_v4}`")
+        if pub_v6 != "—":
+            lines.append(f"🌐 **Public IPv6:** `{pub_v6}`")
 
     elif proto_upper == "TUN":
         iface = settings.get("name") or settings.get("interfaceName") or settings.get("interface") or "xray0"
