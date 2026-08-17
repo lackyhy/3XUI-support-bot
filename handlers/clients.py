@@ -182,8 +182,7 @@ async def cb_menu_all_clients(callback: CallbackQuery):
 
 async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_filter: Optional[str] = None):
     lang = bot_settings.get_language()
-    panel_id = crypto_storage.get_active_panel_id()
-    client_api = ThreeXUIClient.from_storage(panel_id)
+    client_api = ThreeXUIClient.from_storage()
 
     if not client_api:
         await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
@@ -272,8 +271,7 @@ async def cb_client_detail(callback: CallbackQuery):
     uuid_val = parts[3]
     group_filter = parts[4] if len(parts) > 4 else None
 
-    panel_id = crypto_storage.get_active_panel_id()
-    client_api = ThreeXUIClient.from_storage(panel_id)
+    client_api = ThreeXUIClient.from_storage()
     lang = bot_settings.get_language()
 
     if not client_api:
@@ -302,7 +300,7 @@ async def cb_client_detail(callback: CallbackQuery):
         clients = settings.get("clients", [])
         
         for c in clients:
-            if (c.get("id") == uuid_val) or (c.get("password") == uuid_val):
+            if (str(c.get("id")) == str(uuid_val)) or (str(c.get("password")) == str(uuid_val)):
                 attached_inbounds.append(f"• **{ib_remark}** (`{protocol}:{port}`)")
                 if not target_client:
                     target_client = c
@@ -318,7 +316,9 @@ async def cb_client_detail(callback: CallbackQuery):
 
     if clients_res.get("success") and isinstance(clients_res.get("obj"), list):
         for c in clients_res.get("obj", []):
-            if (c.get("uuid") == uuid_val) or (c.get("id") == uuid_val) or (c.get("email") == email):
+            c_uuid = str(c.get("uuid") or c.get("id") or "")
+            c_email = str(c.get("email") or "")
+            if (c_uuid and c_uuid == str(uuid_val)) or (c_email and c_email == email):
                 grp = c.get("group")
                 if grp and str(grp).strip() and str(grp).strip().lower() not in ["—", "-", "none", "null", "undefined"]:
                     group_name = str(grp).strip()
