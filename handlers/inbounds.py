@@ -128,6 +128,29 @@ def extract_tls_versions(stream_settings: dict) -> str:
     
     return "1.2 / 1.3"
 
+def get_deep_key(obj: Any, candidates: List[str]) -> Any:
+    if not obj:
+        return None
+    if isinstance(obj, str) and obj.strip().startswith("{") and obj.strip().endswith("}"):
+        try:
+            obj = json.loads(obj)
+        except Exception:
+            pass
+    if isinstance(obj, dict):
+        for c in candidates:
+            if c in obj and obj[c] is not None and str(obj[c]).strip() != "":
+                return obj[c]
+        for v in obj.values():
+            res = get_deep_key(v, candidates)
+            if res is not None and str(res).strip() != "":
+                return res
+    elif isinstance(obj, list):
+        for item in obj:
+            res = get_deep_key(item, candidates)
+            if res is not None and str(res).strip() != "":
+                return res
+    return None
+
 def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     proto_upper = protocol.upper()
     settings = ensure_dict(inbound.get("settings"))
@@ -259,80 +282,60 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
     elif proto_upper in ["MTPROTO", "MTP"]:
-        st_dicts = [settings, ensure_dict(stream_settings.get("settings")), stream_settings, inbound]
-        
-        sni = ""
-        f_ip = ""
-        f_port = ""
-        f_proxy = None
-        acc_proxy = None
-        pref_ip = ""
-        debug_log = None
-        max_conn = None
-        xray_route = None
-        pub_v4 = ""
-        pub_v6 = ""
-        secret = ""
+        sni = get_deep_key(inbound, ["sni", "domain", "fakeTls", "fake_tls", "faketls", "host", "serverName"]) or "—"
+        f_ip = get_deep_key(inbound, ["frontingIp", "fronting_ip", "domainFrontingIp", "domain_fronting_ip", "frontingHost", "fronting_host"])
+        f_port = get_deep_key(inbound, ["frontingPort", "fronting_port", "domainFrontingPort", "domain_fronting_port"])
+        f_proxy = get_deep_key(inbound, ["frontingProxy", "fronting_proxy", "domainFrontingProxy", "domain_fronting_proxy"])
+        acc_proxy = get_deep_key(inbound, ["acceptProxy", "accept_proxy", "listenProxy", "listen_proxy"])
+        pref_ip = get_deep_key(inbound, ["preferIp", "prefer_ip", "ipPreference", "ip_preference", "domainStrategy", "domain_strategy"]) or "prefer-ipv4"
+        debug_log = get_deep_key(inbound, ["debug", "debugLog", "debug_log", "logDebug", "log_debug"])
+        max_conn = get_deep_key(inbound, ["maxConnections", "max_connections", "maxClients", "max_clients", "maxUsers", "max_users", "connectionLimit"])
+        xray_route = get_deep_key(inbound, ["routingThroughXray", "routing_through_xray", "xrayRouting", "xray_routing", "xray"])
+        pub_v4 = get_deep_key(inbound, ["publicIPv4", "public_ipv4", "publicIp4", "public_ip4", "publicIp", "public_ip", "ip4", "externalIPv4"])
+        pub_v6 = get_deep_key(inbound, ["publicIPv6", "public_ipv6", "publicIp6", "public_ip6", "ip6", "externalIPv6"])
+        secret = get_deep_key(inbound, ["secret"])
 
-        for d in st_dicts:
-            if not isinstance(d, dict): continue
-            if not sni:
-                sni = str(d.get("sni") or d.get("domain") or d.get("fakeTls") or d.get("fake_tls") or d.get("host") or "")
-            if not f_ip:
-                f_ip = str(d.get("frontingIp") or d.get("fronting_ip") or d.get("domainFrontingIp") or d.get("domain_fronting_ip") or "")
-            if not f_port:
-                f_port = str(d.get("frontingPort") or d.get("fronting_port") or d.get("domainFrontingPort") or d.get("domain_fronting_port") or "")
-            if f_proxy is None and ("frontingProxy" in d or "domainFrontingProxy" in d or "fronting_proxy" in d):
-                f_proxy = bool(d.get("frontingProxy") or d.get("domainFrontingProxy") or d.get("fronting_proxy"))
-            if acc_proxy is None and ("acceptProxy" in d or "accept_proxy" in d):
-                acc_proxy = bool(d.get("acceptProxy") or d.get("accept_proxy"))
-            if not pref_ip:
-                pref_ip = str(d.get("preferIp") or d.get("prefer_ip") or d.get("domainStrategy") or "")
-            if debug_log is None and ("debug" in d or "debugLog" in d or "debug_log" in d):
-                debug_log = bool(d.get("debug") or d.get("debugLog") or d.get("debug_log"))
-            if max_conn is None and ("maxConnections" in d or "maxClients" in d or "max_connections" in d):
-                max_conn = d.get("maxConnections") or d.get("maxClients") or d.get("max_connections")
-            if xray_route is None and ("xray" in d or "routingThroughXray" in d or "xrayRouting" in d):
-                xray_route = bool(d.get("xray") or d.get("routingThroughXray") or d.get("xrayRouting"))
-            if not pub_v4:
-                pub_v4 = str(d.get("publicIPv4") or d.get("public_ipv4") or d.get("publicIp") or d.get("public_ip") or d.get("ip4") or "")
-            if not pub_v6:
-                pub_v6 = str(d.get("publicIPv6") or d.get("public_ipv6") or d.get("publicIp6") or d.get("public_ip6") or d.get("ip6") or "")
-            if not secret:
-                secret = str(d.get("secret") or "")
-
-        if (not sni or sni == "—") and secret and len(secret) > 32:
+        if (not sni or sni == "—") and secret and len(str(secret)) > 32:
             try:
-                if secret.startswith("ee"):
-                    domain_part = secret[34:]
+                sec_str = str(secret)
+                if sec_str.startswith("ee"):
+                    domain_part = sec_str[34:]
                     decoded_domain = bytes.fromhex(domain_part).decode("ascii", errors="ignore")
                     if decoded_domain and "." in decoded_domain:
                         sni = decoded_domain.strip()
             except Exception:
                 pass
 
-        if not sni: sni = "www.cloudflare.com"
-        if not f_ip: f_ip = "127.0.0.1"
-        if not f_port: f_port = "443"
-        if not pref_ip: pref_ip = "prefer-ipv4"
-        if max_conn is None: max_conn = 0
-
         bool_fmt = lambda b: ("🟢 YES" if lang == "en" else "🟢 ДА") if b else ("⚪ NO" if lang == "en" else "⚪ НЕТ")
 
         lines.append(f"🌐 **FakeTLS (SNI):** `{sni}`")
-        lines.append(f"🖥 **Domain Fronting:** `{f_ip}:{f_port}`")
+        if f_ip and f_port:
+            lines.append(f"🖥 **Domain Fronting:** `{f_ip}:{f_port}`")
+        elif f_ip:
+            lines.append(f"🖥 **Domain Fronting IP:** `{f_ip}`")
+        elif f_port:
+            lines.append(f"🖥 **Domain Fronting Port:** `{f_port}`")
+
         if f_proxy is not None:
             lines.append(f"⚡ **Fronting PROXY:** {bool_fmt(f_proxy)}")
         if acc_proxy is not None:
             lines.append(f"⚡ **Accept PROXY:** {bool_fmt(acc_proxy)}")
+
         lines.append(f"⚙️ **IP Preference:** `{pref_ip}`")
+
         if debug_log is not None:
             lines.append(f"📜 **Debug Log:** {bool_fmt(debug_log)}")
-        lines.append(f"👥 **Max Connections:** `{max_conn}`")
+
+        if max_conn is not None:
+            lines.append(f"👥 **Max Connections:** `{max_conn}`")
+
         if xray_route is not None:
             lines.append(f"🔀 **Xray Routing:** {bool_fmt(xray_route)}")
-        lines.append(f"🌐 **Public IPv4:** `{pub_v4 if pub_v4 else '1.2.3.4'}`")
-        lines.append(f"🌐 **Public IPv6:** `{pub_v6 if pub_v6 else '2001:db8::1'}`")
+
+        if pub_v4:
+            lines.append(f"🌐 **Public IPv4:** `{pub_v4}`")
+        if pub_v6:
+            lines.append(f"🌐 **Public IPv6:** `{pub_v6}`")
 
     elif proto_upper == "TUN":
         iface = settings.get("name") or settings.get("interfaceName") or settings.get("interface") or "xray0"
