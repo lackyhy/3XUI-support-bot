@@ -136,7 +136,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     lines = []
 
     if proto_upper in ["VLESS", "VMESS", "TROJAN"]:
-        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`")
         utls = extract_utls(stream_settings)
 
         if sec == "reality":
@@ -194,7 +194,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
     elif proto_upper == "SHADOWSOCKS":
         method = settings.get("method") or settings.get("cipher") or "—"
         passwd = settings.get("password") or "—"
-        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`")
         lines.append(f"🔑 **Cipher / Method:** `{method}`")
         if passwd != "—":
             lines.append(f"🔒 **Password:** `{passwd}`")
@@ -217,7 +217,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
                 lines.append(f"👥 **Users:** `{', '.join(usernames)}`")
 
     elif proto_upper in ["HYSTERIA", "HYSTERIA2"]:
-        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`")
         
         h_set = ensure_dict(stream_settings.get("hysteriaSettings") or stream_settings.get("hysteria2Settings"))
         obfs = h_set.get("obfs") or h_set.get("obfsType") or "—"
@@ -257,7 +257,7 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             lines.append(f"🔑 **Public Key:** `{pub_key}`")
 
     else:
-        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`")
 
     return "\n".join(lines)
 
@@ -326,7 +326,7 @@ async def render_inbound_card(callback: CallbackQuery, inbound_id: int):
         f"{lbl_server} `{server_name}`\n"
         f"{lbl_node} `{listen}`\n"
         f"🆔 **ID:** `{inbound_id}` | Status: **{enable}**\n"
-        f"{lbl_proto} `{protocol}` (Port: `{port}`)\n"
+        f"{lbl_proto} `{protocol}` (Port: `{port}`)\n\n"
         f"{proto_details}\n\n"
         f"{lbl_sniff} {sniff_enabled}\n"
         f"{sniff_details}\n"
