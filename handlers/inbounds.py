@@ -147,6 +147,32 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             if usernames:
                 lines.append(f"👥 **Users:** `{', '.join(usernames)}`")
 
+    elif proto_upper in ["HYSTERIA", "HYSTERIA2"]:
+        lines.append(f"🌐 **Network:** `{net}` / `{sec}`\n")
+        
+        h_set = ensure_dict(stream_settings.get("hysteriaSettings") or stream_settings.get("hysteria2Settings"))
+        obfs = h_set.get("obfs") or h_set.get("obfsType") or "—"
+        up_mbps = h_set.get("up_mbps") or h_set.get("up")
+        down_mbps = h_set.get("down_mbps") or h_set.get("down")
+
+        if sec == "tls":
+            tls_set = ensure_dict(stream_settings.get("tlsSettings"))
+            utls = tls_set.get("fingerprint") or "—"
+            sni = tls_set.get("serverName") or "—"
+            alpn = tls_set.get("alpn")
+            alpn_str = ", ".join(alpn) if isinstance(alpn, list) and alpn else "—"
+            lines.append(f"🔑 **uTLS:** `{utls}`")
+            lines.append(f"🌐 **SNI:** `{sni}`")
+            if alpn_str != "—":
+                lines.append(f"📜 **ALPN:** `{alpn_str}`")
+        elif sec != "none":
+            lines.append(f"🔒 **Security:** `{sec}`")
+
+        if obfs != "—":
+            lines.append(f"🛡 **Obfs:** `{obfs}`")
+        if up_mbps or down_mbps:
+            lines.append(f"🚀 **Speed Limit:** ⬆️ `{up_mbps or '∞'}` Mbps | ⬇️ `{down_mbps or '∞'}` Mbps")
+
     elif proto_upper == "WIREGUARD":
         mtu = settings.get("mtu", 1420)
         pub_key = settings.get("pubKey") or settings.get("publicKey") or "—"
