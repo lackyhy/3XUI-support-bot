@@ -1,9 +1,11 @@
 from typing import Optional, Dict, Any, List
 import json
+from urllib.parse import urlparse
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
 from core.api_client import ThreeXUIClient, format_bytes, ensure_dict
+import core.crypto_storage as crypto_storage
 from core import bot_settings
 from core.i18n import t
 from keyboards import inline as keyboards
@@ -354,7 +356,10 @@ async def render_inbound_card(callback: CallbackQuery, inbound_id: int):
         await callback.message.edit_text("❌ Inbound not found." if lang == "en" else "❌ Инбаунд не найден.", reply_markup=keyboards.inbounds_list_kb([], lang=lang))
         return
 
-    server_name = server_info.get("obj", {}).get("hostname", "3x-ui Server")
+    parsed_host = urlparse(client_api.host)
+    host_display = parsed_host.hostname or parsed_host.netloc or client_api.host
+    creds = crypto_storage.load_credentials() or {}
+    server_name = creds.get("name") or server_info.get("obj", {}).get("hostname") or host_display
     remark = inbound.get("remark", f"Inbound #{inbound_id}")
     protocol = inbound.get("protocol", "").upper()
     port = inbound.get("port")
