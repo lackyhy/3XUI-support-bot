@@ -266,37 +266,14 @@ class ThreeXUIClient:
                                 if 0 <= diff_sec <= 300:
                                     online_emails.add(str(email))
 
-        if online_emails:
-            return list(online_emails)
-
-        endpoints = [
-            ("POST", "/panel/api/inbounds/onlines"),
-            ("POST", "/panel/api/server/onlines"),
-            ("GET", "/panel/api/inbounds/onlines")
-        ]
-        for method, ep in endpoints:
-            res_ep = await self._request(method, ep)
-            if res_ep.get("success") and isinstance(res_ep.get("obj"), list):
-                return [str(item) for item in res_ep["obj"] if item]
-
-        return []
+        return list(online_emails)
 
     async def get_clients_list(self) -> Dict[str, Any]:
         """
         Fetches the master client database list directly from 3x-ui panel (/panel/api/clients/list).
         Contains exact client groups, traffic, attached inbounds, and UUIDs.
         """
-        endpoints = [
-            ("GET", "/panel/api/clients/list"),
-            ("POST", "/panel/api/clients/list"),
-            ("GET", "/panel/api/inbounds/clients/list"),
-            ("POST", "/panel/api/inbounds/clients/list")
-        ]
-        for method, ep in endpoints:
-            res = await self._request(method, ep)
-            if res.get("success") and "obj" in res:
-                return res
-        return {"success": False, "msg": "Client list endpoint not available"}
+        return await self._request("GET", "/panel/api/clients/list")
 
     async def get_inbound(self, inbound_id: int) -> Optional[Dict[str, Any]]:
         res = await self.get_inbounds()
