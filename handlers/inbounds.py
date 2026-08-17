@@ -331,10 +331,14 @@ def build_protocol_details_text(protocol: str, inbound: dict, lang: str) -> str:
             0
         )
 
-        xray_route = (
-            settings.get("routingThroughXray") or
+        xray_route = bool(
             settings.get("xrayRouting") or
-            False
+            settings.get("routingThroughXray") or
+            settings.get("routeThroughXray") or
+            settings.get("xrayRoute") or
+            settings.get("xray") or
+            settings.get("xray_routing") or
+            settings.get("routing_through_xray")
         )
 
         pub_v4 = (
