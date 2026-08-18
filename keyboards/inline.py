@@ -304,15 +304,17 @@ def clients_list_kb(inbound_id: int, clients: List[Dict[str, Any]], page: int = 
     buttons.append([InlineKeyboardButton(text=t("btn_back_to_inbounds", lang), callback_data=f"inbound_view_{inbound_id}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def client_detail_kb(inbound_id: int, uuid_val: str, email: str, is_enabled: bool, group_filter: str = "all", lang: Optional[str] = None) -> InlineKeyboardMarkup:
+def client_detail_kb(inbound_id: int, uuid_val: str, email: str, is_enabled: bool, group_filter: Optional[str] = "all", lang: Optional[str] = None) -> InlineKeyboardMarkup:
     status_btn_text = t("btn_deactivate", lang) if is_enabled else t("btn_activate", lang)
-    if group_filter.startswith("inbound"):
-        ib_num = group_filter.replace("inbound", "")
+    gf_str = str(group_filter) if group_filter else "all"
+
+    if gf_str.startswith("inbound"):
+        ib_num = gf_str.replace("inbound", "")
         back_cb = f"clients_list_{ib_num}_0"
-    elif group_filter == "all":
+    elif gf_str == "all":
         back_cb = "menu_all_clients_0"
     else:
-        back_cb = f"menu_group_clients_{group_filter}_0"
+        back_cb = f"menu_group_clients_{gf_str}_0"
 
     return InlineKeyboardMarkup(inline_keyboard=[
         [

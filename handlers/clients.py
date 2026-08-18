@@ -281,7 +281,7 @@ async def cb_client_detail(callback: CallbackQuery):
         
         for c in clients:
             if (str(c.get("id")) == str(uuid_val)) or (str(c.get("password")) == str(uuid_val)):
-                attached_inbounds.append(f"• **{ib_remark}** (`{protocol}:{port}`)")
+                attached_inbounds.append(f"• `{ib_remark}` (`{protocol}:{port}`)")
                 if not target_client:
                     target_client = c
 

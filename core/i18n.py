@@ -60,7 +60,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "page_info": "Page {current} of {total}",
 
         # Client Profile
-        "client_profile_title": "👤 **Client Profile: {email}**",
+        "client_profile_title": "👤 **Client Profile:** `{email}`",
         "client_uuid": "🆔 UUID / Pass:",
         "client_group": "👥 Group:",
         "client_status": "Status:",
@@ -91,7 +91,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "inbounds_list_title": "🌐 **Inbound Connections List**",
         "total_inbounds_count": "Total connections: **{count}**",
         "select_inbound_to_manage": "Select a connection below to manage clients:",
-        "inbound_card_title": "🌐 **Inbound: {remark}**",
+        "inbound_card_title": "🌐 **Inbound:** `{remark}`",
         "server_label": "🖥 **Server:**",
         "node_listen": "🌐 **Node (Listen):**",
         "proto_port": "🛠 **Protocol:**",
@@ -183,7 +183,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "page_info": "Страница {current} из {total}",
 
         # Профиль клиента
-        "client_profile_title": "👤 **Профиль клиента: {email}**",
+        "client_profile_title": "👤 **Профиль клиента:** `{email}`",
         "client_uuid": "🆔 UUID / Pass:",
         "client_group": "👥 Группа:",
         "client_status": "Статус:",
@@ -214,7 +214,7 @@ MESSAGES: Dict[str, Dict[str, str]] = {
         "inbounds_list_title": "🌐 **Список подключений (Inbounds)**",
         "total_inbounds_count": "Всего подключений: **{count}**",
         "select_inbound_to_manage": "Выберите нужное подключение для управления клиентами:",
-        "inbound_card_title": "🌐 **Инбаунд: {remark}**",
+        "inbound_card_title": "🌐 **Инбаунд:** `{remark}`",
         "server_label": "🖥 **Сервер:**",
         "node_listen": "🌐 **Узел (Listen):**",
         "proto_port": "🛠 **Протокол:**",
