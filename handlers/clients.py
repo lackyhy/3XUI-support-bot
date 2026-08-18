@@ -385,6 +385,24 @@ async def render_client_detail(callback: CallbackQuery, inbound_id: int, uuid_va
                     parse_mode="Markdown"
                 )
 
+@router.callback_query(F.data.startswith("cv:"))
+@router.callback_query(F.data.startswith("client_view:"))
+@router.callback_query(F.data.startswith("client_view_"))
+async def cb_client_detail(callback: CallbackQuery):
+    if ":" in callback.data:
+        parts = callback.data.split(":")
+        inbound_id = int(parts[1])
+        uuid_val = parts[2]
+        group_filter = parts[3] if len(parts) > 3 else None
+    else:
+        parts = callback.data.split("_")
+        inbound_id = int(parts[2])
+        uuid_val = parts[3]
+        group_filter = parts[4] if len(parts) > 4 else None
+
+    await callback.answer("Loading profile..." if bot_settings.get_language() == "en" else "Загрузка профиля...")
+    await render_client_detail(callback, inbound_id, uuid_val, group_filter=group_filter)
+
 @router.callback_query(F.data.startswith("client_key_select_"))
 async def cb_client_key_select(callback: CallbackQuery):
     parts = callback.data.split("_")
