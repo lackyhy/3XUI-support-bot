@@ -213,9 +213,8 @@ async def cb_delete_credentials(callback: CallbackQuery):
 @router.callback_query(F.data == "cancel_action")
 async def cb_cancel_action(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text(
-        "❌ **Действие отменено.**",
-        reply_markup=get_main_menu_markup(),
-        parse_mode="Markdown"
-    )
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
     await callback.answer()
