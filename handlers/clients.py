@@ -304,16 +304,30 @@ async def cb_client_detail(callback: CallbackQuery):
                     group_name = str(grp).strip()
                     break
 
-    # Search client traffic across inbounds using max to avoid multi-inbound duplication
+    # Search client traffic & online status across inbounds
+    import time
+    now_ms = time.time() * 1000
     used_up = 0
     used_down = 0
+    last_online_ts = 0
+
     for ib in inbounds:
         client_stats = ib.get("clientStats", [])
         for stat in client_stats:
-            if stat.get("email") == email or stat.get("uuid") == uuid_val or stat.get("id") == uuid_val:
+            if stat.get("email") == email or str(stat.get("uuid")) == str(uuid_val) or str(stat.get("id")) == str(uuid_val):
                 used_up = max(used_up, stat.get("up", 0))
                 used_down = max(used_down, stat.get("down", 0))
+                last_on = stat.get("lastOnline", 0)
+                if last_on > last_online_ts:
+                    last_online_ts = last_on
 
+    is_online = False
+    if last_online_ts > 0:
+        diff_sec = (now_ms - last_online_ts) / 1000
+        if 0 <= diff_sec <= 300:  # Active within 5 minutes
+            is_online = True
+
+    online_str = t("online_active", lang) if is_online else t("online_inactive", lang)
     used_total = used_up + used_down
     lbl_used = t("used_traffic", lang)
     traffic_str = f"{lbl_used} `{format_bytes(used_total)}` (⬆️ {format_bytes(used_up)} | ⬇️ {format_bytes(used_down)})"
@@ -339,6 +353,7 @@ async def cb_client_detail(callback: CallbackQuery):
     lbl_prof = t("client_profile_title", lang, email=email)
     lbl_uuid = t("client_uuid", lang)
     lbl_group = t("client_group", lang)
+    lbl_online = t("client_online_status", lang)
     lbl_status = t("client_status", lang)
     lbl_attached = t("attached_inbounds", lang, count=attached_count)
     lbl_sub = t("sub_link", lang)
@@ -350,6 +365,7 @@ async def cb_client_detail(callback: CallbackQuery):
         f"{lbl_prof}\n\n"
         f"{lbl_uuid} `{uuid_val}`\n"
         f"{lbl_group} `{group_name}`\n"
+        f"{lbl_online} **{online_str}**\n"
         f"{lbl_status} **{status_str}**\n\n"
         f"{lbl_attached}\n"
         f"{attached_text}\n\n"
