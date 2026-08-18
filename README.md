@@ -98,7 +98,7 @@
 
 ## 🛠 Интеграция с API 3x-ui
 
-Бот оснащен гибридным клиентом API ([core/api_client.py](file:///Users/lcky/project/xuiSup/core/api_client.py)), поддерживающим как **Modern Clients REST API (Sanaei 3x-ui v2.4+)**, так и legacy-эндпоинты:
+Бот оснащен гибридным клиентом API ([core/api_client.py](core/api_client.py)), поддерживающим как **Modern Clients REST API (Sanaei 3x-ui v2.4+)**, так и legacy-эндпоинты:
 
 - Авторизация по **Bearer Token** или **Логину/Паролю**.
 - Эндпоинты клиентов: `/panel/api/clients/*` (`add`, `update`, `del`, `resetTraffic`, `clearIps`, `attach`, `detach`).
