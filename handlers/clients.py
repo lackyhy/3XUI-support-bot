@@ -236,21 +236,7 @@ async def render_all_clients_page(callback: CallbackQuery, page: int = 0, group_
     markup = keyboards.all_clients_paginated_kb(items, page=page, group_filter=group_filter, lang=lang)
     await callback.message.edit_text(text, reply_markup=markup, parse_mode="Markdown")
 
-@router.callback_query(F.data.startswith("cv:"))
-@router.callback_query(F.data.startswith("client_view:"))
-@router.callback_query(F.data.startswith("client_view_"))
-async def cb_client_detail(callback: CallbackQuery):
-    if ":" in callback.data:
-        parts = callback.data.split(":")
-        inbound_id = int(parts[1])
-        uuid_val = parts[2]
-        group_filter = parts[3] if len(parts) > 3 else None
-    else:
-        parts = callback.data.split("_")
-        inbound_id = int(parts[2])
-        uuid_val = parts[3]
-        group_filter = parts[4] if len(parts) > 4 else None
-
+async def render_client_detail(callback: CallbackQuery, inbound_id: int, uuid_val: str, group_filter: Optional[str] = None):
     client_api = ThreeXUIClient.from_storage()
     lang = bot_settings.get_language()
 
@@ -258,7 +244,6 @@ async def cb_client_detail(callback: CallbackQuery):
         await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
-    await callback.answer("Loading profile..." if lang == "en" else "Загрузка профиля...")
     res = await client_api.get_inbounds()
     clients_res = await client_api.get_clients_list()
     await client_api.close()
@@ -304,7 +289,6 @@ async def cb_client_detail(callback: CallbackQuery):
                     group_name = str(grp).strip()
                     break
 
-    # Search client traffic & online status across inbounds
     import time
     now_ms = time.time() * 1000
     used_up = 0
@@ -324,7 +308,7 @@ async def cb_client_detail(callback: CallbackQuery):
     is_online = False
     if last_online_ts > 0:
         diff_sec = (now_ms - last_online_ts) / 1000
-        if 0 <= diff_sec <= 300:  # Active within 5 minutes
+        if 0 <= diff_sec <= 300:
             is_online = True
 
     online_str = t("online_active", lang) if is_online else t("online_inactive", lang)
@@ -380,7 +364,7 @@ async def cb_client_detail(callback: CallbackQuery):
         await callback.message.delete()
         await callback.message.answer(
             text,
-            reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled, group_filter=group_filter),
+            reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled, group_filter=group_filter, lang=lang),
             parse_mode="Markdown"
         )
     else:
@@ -388,7 +372,7 @@ async def cb_client_detail(callback: CallbackQuery):
         try:
             await callback.message.edit_text(
                 text,
-                reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled, group_filter=group_filter),
+                reply_markup=keyboards.client_detail_kb(inbound_id, uuid_val, email, is_enabled, group_filter=group_filter, lang=lang),
                 parse_mode="Markdown"
             )
         except TelegramBadRequest as e:
@@ -648,8 +632,7 @@ async def cb_toggle_client(callback: CallbackQuery):
     if res.get("success"):
         state_text = "включен" if new_state else "отключен"
         await callback.answer(f"Клиент {state_text}!")
-        # Refresh screen
-        await cb_view_client(callback)
+        await render_client_detail(callback, inbound_id, uuid_val)
     else:
         await callback.answer(f"Ошибка: {res.get('msg')}", show_alert=True)
 
