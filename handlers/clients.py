@@ -743,9 +743,10 @@ async def cb_do_delete(callback: CallbackQuery):
 # ADD CLIENT FSM WIZARD
 @router.callback_query(F.data == "menu_add_client")
 async def cb_add_client_start(callback: CallbackQuery, state: FSMContext):
+    lang = bot_settings.get_language()
     client_api = ThreeXUIClient.from_storage()
     if not client_api:
-        await callback.answer("Ошибка авторизации", show_alert=True)
+        await callback.answer("Auth error" if lang == "en" else "Ошибка авторизации", show_alert=True)
         return
 
     res = await client_api.get_inbounds()
