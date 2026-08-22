@@ -1,11 +1,12 @@
-# 🚀 3x-ui Management & Support Telegram Bot
+# 🚀 3x-ui & Remnawave Management & Support Telegram Bot
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
 ![aiogram](https://img.shields.io/badge/aiogram-3.x-2CA5E0?logo=telegram)
 ![Encryption](https://img.shields.io/badge/Security-Fernet_AES--256-green)
 ![Sanaei 3x-ui](https://img.shields.io/badge/3x--ui-Modern_REST_API-orange)
+![Remnawave](https://img.shields.io/badge/Remnawave-REST_API-purple?logo=databricks)
 
-Мощный, безопасный и функциональный Telegram-бот для полного и удобного администрирования панелей **Sanaei 3x-ui**.
+Мощный, безопасный и функциональный Telegram-бот для полного и удобного администрирования панелей **Sanaei 3x-ui** и **Remnawave**.
 
 ---
 
