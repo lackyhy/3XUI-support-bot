@@ -3,7 +3,7 @@ import base64
 import urllib.parse
 from typing import Dict, Any, List, Optional, Tuple
 import httpx
-from core import crypto_storage
+from x_ui.core import crypto_storage
 
 def format_bytes(size: int) -> str:
     """Format byte sizes to human-readable strings."""

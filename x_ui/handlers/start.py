@@ -4,19 +4,25 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
 
-from core import crypto_storage
-from keyboards import inline as keyboards
+from x_ui.core import crypto_storage
+from x_ui.keyboards import inline as keyboards
 
 router = Router()
 
-from core import bot_settings
-from core.i18n import t
+from x_ui.core import bot_settings
+from x_ui.core.i18n import t
 
 def get_main_menu_markup():
     has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
-    name = active_panel.get("name", "Main Server") if active_panel else "No Server"
     lang = bot_settings.get_language()
+    
+    if active_panel and active_panel.get("panel_type") == "remnawave":
+        from remnawave.keyboards.inline import remna_main_menu_kb
+        name = active_panel.get("name", "Remnawave Server")
+        return remna_main_menu_kb(active_panel_name=name, lang=lang)
+        
+    name = active_panel.get("name", "Main Server") if active_panel else "No Server"
     return keyboards.main_menu_kb(has_creds=has_creds, active_panel_name=name, lang=lang)
 
 @router.message(CommandStart())
@@ -24,6 +30,12 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
+    
+    if active_panel and active_panel.get("panel_type") == "remnawave":
+        from remnawave.handlers.start import show_remna_dashboard
+        await show_remna_dashboard(message, state)
+        return
+
     lang = bot_settings.get_language()
     
     if lang == "en":
@@ -50,8 +62,14 @@ async def cmd_start(message: Message, state: FSMContext):
 @router.callback_query(F.data == "menu_main")
 async def cb_menu_main(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
+    
+    if active_panel and active_panel.get("panel_type") == "remnawave":
+        from remnawave.handlers.start import show_remna_dashboard
+        await show_remna_dashboard(callback, state)
+        return
+
+    has_creds = crypto_storage.has_credentials()
     lang = bot_settings.get_language()
     
     panel_name = active_panel.get("name", "Server") if active_panel else ("No connection" if lang == "en" else "Нет подключения")
@@ -73,22 +91,52 @@ async def cb_menu_main(callback: CallbackQuery, state: FSMContext):
             raise e
     await callback.answer()
 
-# MULTI-PANEL SWITCHING MENU
+# MULTI-PANEL SWITCHING MENU (CATEGORIES FIRST)
 @router.callback_query(F.data == "menu_select_panel")
 async def cb_menu_select_panel(callback: CallbackQuery):
     lang = bot_settings.get_language()
-    panels = crypto_storage.get_panels()
-    active_panel = crypto_storage.get_active_panel()
-    active_id = active_panel.get("id") if active_panel else None
-
-    title = t("panels_list_title", lang)
-    select_lbl = t("select_server_to_switch", lang)
-
-    text = f"{title}\n\n{select_lbl}"
+    text = (
+        "🖥 **Server Categories**\n\n"
+        "Select the category of panels to manage:"
+        if lang == "en" else
+        "🖥 **Категории серверов**\n\n"
+        "Выберите тип подключаемой панели для управления:"
+    )
     try:
         await callback.message.edit_text(
             text,
-            reply_markup=keyboards.panels_list_kb(panels, active_id, lang=lang),
+            reply_markup=keyboards.server_categories_kb(lang=lang),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            pass
+        else:
+            raise e
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("menu_select_cat_"))
+async def cb_menu_select_category(callback: CallbackQuery):
+    lang = bot_settings.get_language()
+    category = callback.data.replace("menu_select_cat_", "")
+    
+    panels = crypto_storage.get_panels()
+    # Filter panels by category
+    filtered_panels = [p for p in panels if p.get("panel_type", "x_ui") == category]
+    
+    active_panel = crypto_storage.get_active_panel()
+    active_id = active_panel.get("id") if active_panel else None
+    
+    title = t("panels_list_title", lang)
+    select_lbl = t("select_server_to_switch", lang)
+    
+    cat_name = "Sanaei 3x-ui" if category == "x_ui" else "Remnawave"
+    text = f"🖥 **{cat_name} Servers**\n\n{select_lbl}" if lang == "en" else f"🖥 **Серверы {cat_name}**\n\n{select_lbl}"
+    
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=keyboards.panels_list_kb(filtered_panels, active_id, lang=lang),
             parse_mode="Markdown"
         )
     except TelegramBadRequest as e:
@@ -107,6 +155,12 @@ async def cb_switch_panel(callback: CallbackQuery):
         active_panel = crypto_storage.get_active_panel()
         p_name = active_panel.get("name", "Сервер")
         await callback.answer(f"Переключено на сервер {p_name}!")
+        
+        if active_panel.get("panel_type") == "remnawave":
+            from remnawave.handlers.start import show_remna_dashboard
+            await show_remna_dashboard(callback)
+            return
+            
         await callback.message.edit_text(
             f"✅ **Управление переключено на сервер `{p_name}`!**",
             reply_markup=get_main_menu_markup(),

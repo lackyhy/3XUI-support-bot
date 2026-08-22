@@ -3,40 +3,78 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
-from core import crypto_storage
-from keyboards import inline as keyboards
-from states.states import PanelSetupStates, RenamePanelStates
-from core.api_client import ThreeXUIClient, format_bytes
+from x_ui.core import crypto_storage
+from x_ui.keyboards import inline as keyboards
+from x_ui.states.states import PanelSetupStates, RenamePanelStates
+from x_ui.core.api_client import ThreeXUIClient, format_bytes
 
 router = Router()
 
 def get_main_menu_markup():
     has_creds = crypto_storage.has_credentials()
     active_panel = crypto_storage.get_active_panel()
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
+    
+    if active_panel and active_panel.get("panel_type") == "remnawave":
+        from remnawave.keyboards.inline import remna_main_menu_kb
+        name = active_panel.get("name", "Remnawave Server")
+        return remna_main_menu_kb(active_panel_name=name, lang=lang)
+        
     name = active_panel.get("name", "Основной сервер") if active_panel else "Без сервера"
-    return keyboards.main_menu_kb(has_creds=has_creds, active_panel_name=name)
+    return keyboards.main_menu_kb(has_creds=has_creds, active_panel_name=name, lang=lang)
 
 @router.callback_query(F.data == "setup_panel")
 async def start_panel_setup(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(PanelSetupStates.waiting_for_host)
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
+    await state.set_state(PanelSetupStates.waiting_for_panel_type)
     text = (
-        "⚙️ **Добавление сервера 3x-ui** (Шаг 1 из 3)\n\n"
-        "Введите **URL панели 3x-ui**.\n"
+        "⚙️ **Добавление сервера**\n\n"
+        "Выберите тип подключаемой панели:"
+        if lang != "en" else
+        "⚙️ **Add Server**\n\n"
+        "Select the panel type to connect:"
+    )
+    await callback.message.edit_text(text, reply_markup=keyboards.panel_type_kb(lang=lang), parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(PanelSetupStates.waiting_for_panel_type, F.data.startswith("panel_type_"))
+async def process_panel_type(callback: CallbackQuery, state: FSMContext):
+    panel_type = callback.data.replace("panel_type_", "")
+    await state.update_data(panel_type=panel_type)
+    await state.set_state(PanelSetupStates.waiting_for_host)
+    
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
+    
+    text = (
+        f"⚙️ **Добавление сервера {panel_type.upper()}** (Шаг 1 из 3)\n\n"
+        "Введите **URL панели**.\n"
         "*(Имя сервера будет определено автоматически по IP/Домену, и его можно изменить в любой момент)*\n\n"
         "Примеры:\n"
         "• `http://1.2.3.4:2053`\n"
         "• `https://my-panel.domain.com:8441/webpath`"
+        if lang != "en" else
+        f"⚙️ **Add Server {panel_type.upper()}** (Step 1 of 3)\n\n"
+        "Enter the **panel URL**.\n"
+        "*(Server name will be derived automatically from IP/Domain, and can be changed at any time)*\n\n"
+        "Examples:\n"
+        "• `http://1.2.3.4:2053`\n"
+        "• `https://my-panel.domain.com:8441/webpath`"
     )
-    await callback.message.edit_text(text, reply_markup=keyboards.cancel_kb(), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=keyboards.cancel_kb(lang=lang), parse_mode="Markdown")
     await callback.answer()
 
 @router.message(PanelSetupStates.waiting_for_host)
 async def process_host(message: Message, state: FSMContext):
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
     host = message.text.strip().rstrip('/')
     if not (host.startswith("http://") or host.startswith("https://")):
         await message.answer(
-            "❌ Неверный формат URL. Укажите протокол `http://` или `https://`!\nПопробуйте еще раз:",
-            reply_markup=keyboards.cancel_kb(),
+            "❌ Неверный формат URL. Укажите протокол `http://` или `https://`!\nПопробуйте еще раз:" if lang != "en" else "❌ Invalid URL format. Specify `http://` or `https://`!\nTry again:",
+            reply_markup=keyboards.cancel_kb(lang=lang),
             parse_mode="Markdown"
         )
         return
@@ -45,40 +83,62 @@ async def process_host(message: Message, state: FSMContext):
 
     await state.update_data(host=host, default_name=default_name)
     await state.set_state(PanelSetupStates.waiting_for_auth_type)
+    
+    data = await state.get_data()
+    panel_type = data.get("panel_type", "x_ui")
+    
     await message.answer(
         f"⚙️ **Добавление сервера** (`{default_name}`)\n\n"
-        "Выберите способ авторизации в панели 3x-ui:\n\n"
-        "🔑 **Bearer Token** (Если у вас есть API токен)\n"
-        "👤 **Логин и Пароль** (Стандартный вход в панель)",
-        reply_markup=keyboards.auth_type_kb(),
+        "Выберите способ авторизации в панели:\n\n"
+        "🔑 **Bearer Token** (Если у вас есть API токен / JWT)\n"
+        "👤 **Логин и Пароль** (Стандартный вход в панель)"
+        if lang != "en" else
+        f"⚙️ **Add Server** (`{default_name}`)\n\n"
+        "Select authorization mode:\n\n"
+        "🔑 **Bearer Token** (If you have an API / JWT token)\n"
+        "👤 **Username & Password** (Standard dashboard login)",
+        reply_markup=keyboards.auth_type_kb(lang=lang),
         parse_mode="Markdown"
     )
 
 @router.callback_query(PanelSetupStates.waiting_for_auth_type, F.data == "auth_mode_token")
 async def process_auth_type_token(callback: CallbackQuery, state: FSMContext):
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
     await state.set_state(PanelSetupStates.waiting_for_token)
     await callback.message.edit_text(
         "🔑 **Авторизация по Bearer Token** (Шаг 3 из 3)\n\n"
         "Отправьте ваш **Bearer Token** панели:\n"
-        "*(Токен будет зашифрован алгоритмом AES-256)*",
-        reply_markup=keyboards.cancel_kb(),
+        "*(Токен будет зашифрован алгоритмом AES-256)*"
+        if lang != "en" else
+        "🔑 **Bearer Token Authorization** (Step 3 of 3)\n\n"
+        "Send your panel **Bearer Token**:\n"
+        "*(Token will be encrypted with AES-256)*",
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
 
 @router.callback_query(PanelSetupStates.waiting_for_auth_type, F.data == "auth_mode_creds")
 async def process_auth_type_creds(callback: CallbackQuery, state: FSMContext):
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
     await state.set_state(PanelSetupStates.waiting_for_username)
     await callback.message.edit_text(
         "👤 **Авторизация по Логину и Паролю**\n\n"
-        "Введите **Логин** администратора панели:",
-        reply_markup=keyboards.cancel_kb(),
+        "Введите **Логин** администратора панели:"
+        if lang != "en" else
+        "👤 **Username & Password Authorization**\n\n"
+        "Enter administrator **Username**:",
+        reply_markup=keyboards.cancel_kb(lang=lang),
         parse_mode="Markdown"
     )
     await callback.answer()
 
 @router.message(PanelSetupStates.waiting_for_token)
 async def process_token(message: Message, state: FSMContext):
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
     token = message.text.strip()
     try:
         await message.delete()  # Hide token for privacy
@@ -87,19 +147,26 @@ async def process_token(message: Message, state: FSMContext):
 
     data = await state.get_data()
     host = data.get("host")
+    panel_type = data.get("panel_type", "x_ui")
     name = data.get("default_name") or crypto_storage.derive_default_panel_name(host)
 
-    status_msg = await message.answer("🔄 **Проверка Bearer Token в панели...**", parse_mode="Markdown")
+    status_msg = await message.answer("🔄 **Проверка токена в панели...**" if lang != "en" else "🔄 **Verifying token in panel...**", parse_mode="Markdown")
 
-    client = ThreeXUIClient(host=host, token=token, auth_type="token")
-    success, msg = await client.login()
-    await client.close()
+    if panel_type == "remnawave":
+        from remnawave.core.api_client import RemnawaveClient
+        client = RemnawaveClient(host=host, token=token, auth_type="token")
+        success, msg = await client.login()
+        await client.close()
+    else:
+        client = ThreeXUIClient(host=host, token=token, auth_type="token")
+        success, msg = await client.login()
+        await client.close()
 
     if not success:
         await status_msg.edit_text(
-            f"❌ **Не удалось авторизоваться по токену!**\n\n"
-            f"Причина: `{msg}`\n\n"
-            "Пожалуйста, проверьте токен и попробуйте подключить панель заново.",
+            f"❌ **Не удалось авторизоваться по токену!**\n\nПричина: `{msg}`\n\nПожалуйста, проверьте токен и попробуйте подключить панель заново."
+            if lang != "en" else
+            f"❌ **Token authorization failed!**\n\nReason: `{msg}`\n\nPlease check token and try connecting the panel again.",
             reply_markup=get_main_menu_markup(),
             parse_mode="Markdown"
         )
@@ -111,14 +178,15 @@ async def process_token(message: Message, state: FSMContext):
         name=name,
         host=host,
         auth_type="token",
-        token=token
+        token=token,
+        panel_type=panel_type
     )
     await state.clear()
 
     await status_msg.edit_text(
-        f"✅ **Сервер `{name}` успешно подключен и выбран!**\n\n"
-        "Все данные авторизации зашифрованы алгоритмом Fernet (AES-256).\n"
-        "Имя сервера определено автоматически по IP/домену. Вы можете изменить его в Настройках.",
+        f"✅ **Сервер `{name}` успешно подключен и выбран!**\n\nВсе данные авторизации зашифрованы алгоритмом Fernet (AES-256).\nИмя сервера определено автоматически по IP/домену. Вы можете изменить его в Настройках."
+        if lang != "en" else
+        f"✅ **Server `{name}` successfully connected and selected!**\n\nAll credentials are encrypted with Fernet (AES-256).\nServer name derived automatically. You can change it in Settings.",
         reply_markup=get_main_menu_markup(),
         parse_mode="Markdown"
     )
@@ -142,6 +210,8 @@ async def process_username(message: Message, state: FSMContext):
 
 @router.message(PanelSetupStates.waiting_for_password)
 async def process_password(message: Message, state: FSMContext):
+    from x_ui.core import bot_settings
+    lang = bot_settings.get_language()
     password = message.text.strip()
     try:
         await message.delete()  # Hide password for privacy
@@ -151,19 +221,29 @@ async def process_password(message: Message, state: FSMContext):
     data = await state.get_data()
     host = data.get("host")
     username = data.get("username")
+    panel_type = data.get("panel_type", "x_ui")
     name = data.get("default_name") or crypto_storage.derive_default_panel_name(host)
 
-    status_msg = await message.answer("🔄 **Проверка подключения к 3x-ui...**", parse_mode="Markdown")
+    status_msg = await message.answer(
+        "🔄 **Проверка подключения к панели...**" if lang != "en" else "🔄 **Verifying credentials in panel...**",
+        parse_mode="Markdown"
+    )
 
-    client = ThreeXUIClient(host=host, username=username, password=password, auth_type="credentials")
-    success, msg = await client.login()
-    await client.close()
+    if panel_type == "remnawave":
+        from remnawave.core.api_client import RemnawaveClient
+        client = RemnawaveClient(host=host, username=username, password=password, auth_type="credentials")
+        success, msg = await client.login()
+        await client.close()
+    else:
+        client = ThreeXUIClient(host=host, username=username, password=password, auth_type="credentials")
+        success, msg = await client.login()
+        await client.close()
 
     if not success:
         await status_msg.edit_text(
-            f"❌ **Не удалось авторизоваться в панели!**\n\n"
-            f"Причина: `{msg}`\n\n"
-            "Пожалуйста, проверьте данные и попробуйте нажать кнопку настройки заново.",
+            f"❌ **Не удалось авторизоваться в панели!**\n\nПричина: `{msg}`\n\nПожалуйста, проверьте данные и попробуйте нажать кнопку настройки заново."
+            if lang != "en" else
+            f"❌ **Authorization failed!**\n\nReason: `{msg}`\n\nPlease check details and try setting up again.",
             reply_markup=get_main_menu_markup(),
             parse_mode="Markdown"
         )
@@ -177,14 +257,15 @@ async def process_password(message: Message, state: FSMContext):
         auth_type="credentials",
         username=username,
         password=password,
-        token=client.token
+        token=client.token,
+        panel_type=panel_type
     )
     await state.clear()
 
     await status_msg.edit_text(
-        f"✅ **Сервер `{name}` успешно подключен и выбран!**\n\n"
-        "Данные зашифрованы алгоритмом Fernet (AES-256).\n"
-        "Имя сервера определено автоматически по IP/домену. Вы можете изменить его в Настройках.",
+        f"✅ **Сервер `{name}` успешно подключен и выбран!**\n\nДанные зашифрованы алгоритмом Fernet (AES-256).\nИмя сервера определено автоматически по IP/домену. Вы можете изменить его в Настройках."
+        if lang != "en" else
+        f"✅ **Server `{name}` successfully connected and selected!**\n\nCredentials are encrypted with Fernet (AES-256).\nServer name derived automatically. You can change it in Settings.",
         reply_markup=get_main_menu_markup(),
         parse_mode="Markdown"
     )
@@ -239,7 +320,7 @@ async def process_rename_panel(message: Message, state: FSMContext):
 
 # DOCUMENT IMPORT & BACKUP EXPORT
 from aiogram.filters import Command
-from states.states import ImportCredentialsStates
+from x_ui.states.states import ImportCredentialsStates
 import io
 
 async def import_credentials_bytes(message: Message, file_bytes: bytes, key_str: str, state: FSMContext):
@@ -393,8 +474,8 @@ async def process_export_credentials(event):
 
 # BOT MENU & MULTI-PANEL DASHBOARD (/menu)
 import asyncio
-from core import bot_settings
-from core.i18n import t
+from x_ui.core import bot_settings
+from x_ui.core.i18n import t
 from aiogram.exceptions import TelegramBadRequest
 
 async def render_bot_menu_dashboard() -> Tuple[str, str]:

@@ -4,12 +4,12 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.enums import ParseMode
 
-from core.env_setup import ensure_env_file
+from x_ui.core.env_setup import ensure_env_file
 ensure_env_file()
 
 import config
-from middlewares.auth import AdminMiddleware
-from handlers import start, setup, server, inbounds, clients
+from x_ui.middlewares.auth import AdminMiddleware
+from x_ui.handlers import start, setup, server, inbounds, clients
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +48,15 @@ async def main():
     dp.include_router(server.router)
     dp.include_router(inbounds.router)
     dp.include_router(clients.router)
+
+    # Register Remnawave Routers
+    from remnawave.handlers import start as remna_start, users as remna_users, nodes as remna_nodes, profiles as remna_profiles, hosts as remna_hosts, panels as remna_panels
+    dp.include_router(remna_start.router)
+    dp.include_router(remna_users.router)
+    dp.include_router(remna_nodes.router)
+    dp.include_router(remna_profiles.router)
+    dp.include_router(remna_hosts.router)
+    dp.include_router(remna_panels.router)
 
     # Drop pending updates and start polling
     await bot.delete_webhook(drop_pending_updates=True)

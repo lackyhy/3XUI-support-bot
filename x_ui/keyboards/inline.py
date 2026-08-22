@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Tuple, Optional
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from core.i18n import t
+from x_ui.core.i18n import t
 
 def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server", lang: Optional[str] = None) -> InlineKeyboardMarkup:
     cur_lang = lang or "en"
@@ -37,6 +37,22 @@ def main_menu_kb(has_creds: bool = True, active_panel_name: str = "Main Server",
         ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+def server_categories_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    cur_lang = lang or "en"
+    buttons = [
+        [
+            InlineKeyboardButton(text="Sanaei 3x-ui", callback_data="menu_select_cat_x_ui"),
+            InlineKeyboardButton(text="Remnawave", callback_data="menu_select_cat_remnawave")
+        ],
+        [
+            InlineKeyboardButton(text=t("btn_add_server", cur_lang), callback_data="setup_panel")
+        ],
+        [
+            InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")
+        ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 def panels_list_kb(panels: List[Dict[str, Any]], active_id: Optional[str], lang: Optional[str] = None) -> InlineKeyboardMarkup:
     cur_lang = lang or "en"
     buttons = []
@@ -70,7 +86,10 @@ def panels_list_kb(panels: List[Dict[str, Any]], active_id: Optional[str], lang:
         InlineKeyboardButton(text=t("btn_delete_server", cur_lang), callback_data="menu_delete_panel")
     ])
     buttons.append([InlineKeyboardButton(text=t("btn_settings", cur_lang), callback_data="menu_settings")])
-    buttons.append([InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")])
+    buttons.append([
+        InlineKeyboardButton(text="🔙 Categories" if cur_lang == "en" else "🔙 К категориям", callback_data="menu_select_panel"),
+        InlineKeyboardButton(text=t("btn_main_menu", cur_lang), callback_data="menu_main")
+    ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def toggle_panels_kb(panels: List[Dict[str, Any]], lang: Optional[str] = None) -> InlineKeyboardMarkup:
@@ -112,6 +131,13 @@ def initial_status_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=btn_enable, callback_data="client_init_enable_1")],
         [InlineKeyboardButton(text=btn_disable, callback_data="client_init_enable_0")],
+        [InlineKeyboardButton(text=t("btn_cancel", lang), callback_data="cancel_action")]
+    ])
+
+def panel_type_kb(lang: Optional[str] = None) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Sanaei 3x-ui", callback_data="panel_type_x_ui")],
+        [InlineKeyboardButton(text="Remnawave", callback_data="panel_type_remnawave")],
         [InlineKeyboardButton(text=t("btn_cancel", lang), callback_data="cancel_action")]
     ])
 

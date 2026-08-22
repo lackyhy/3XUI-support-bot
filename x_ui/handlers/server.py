@@ -6,11 +6,11 @@ from aiogram.types import CallbackQuery
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
 
-from core.api_client import ThreeXUIClient, format_bytes
-from core import bot_settings
-from core.i18n import t
-from core.geoip import get_ip_geo, format_ipv4_with_2ip
-from keyboards import inline as keyboards
+from x_ui.core.api_client import ThreeXUIClient, format_bytes
+from x_ui.core import bot_settings
+from x_ui.core.i18n import t
+from x_ui.core.geoip import get_ip_geo, format_ipv4_with_2ip
+from x_ui.keyboards import inline as keyboards
 
 router = Router()
 
@@ -184,7 +184,7 @@ async def cb_server_status(callback: CallbackQuery):
 
     await client.close()
 
-    from core import crypto_storage
+    from x_ui.core import crypto_storage
     active_panel = crypto_storage.get_active_panel()
     panel_id = active_panel.get("id") if active_panel else None
     is_enabled = active_panel.get("enabled", True) if active_panel else True
@@ -226,7 +226,7 @@ async def cb_server_status(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("toggle_panel_enable_"))
 async def cb_toggle_panel_enable(callback: CallbackQuery):
-    from core import crypto_storage
+    from x_ui.core import crypto_storage
     panel_id = callback.data.replace("toggle_panel_enable_", "")
     lang = bot_settings.get_language()
     
@@ -387,7 +387,7 @@ async def fetch_single_panel_status_card(p: dict, index: int, total: int, lang: 
 @router.message(Command("status_all"))
 @router.callback_query(F.data == "menu_all_panels_status")
 async def cb_all_panels_status(event):
-    from core import crypto_storage
+    from x_ui.core import crypto_storage
     lang = bot_settings.get_language()
     all_panels = crypto_storage.get_panels()
     panels = [p for p in all_panels if p.get("enabled", True)]

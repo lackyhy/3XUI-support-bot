@@ -1,6 +1,7 @@
 from aiogram.fsm.state import State, StatesGroup
 
 class PanelSetupStates(StatesGroup):
+    waiting_for_panel_type = State()
     waiting_for_name = State()
     waiting_for_host = State()
     waiting_for_auth_type = State()

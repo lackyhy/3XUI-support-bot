@@ -4,11 +4,11 @@ from urllib.parse import urlparse
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
-from core.api_client import ThreeXUIClient, format_bytes, ensure_dict
-import core.crypto_storage as crypto_storage
-from core import bot_settings
-from core.i18n import t
-from keyboards import inline as keyboards
+from x_ui.core.api_client import ThreeXUIClient, format_bytes, ensure_dict
+import x_ui.core.crypto_storage as crypto_storage
+from x_ui.core import bot_settings
+from x_ui.core.i18n import t
+from x_ui.keyboards import inline as keyboards
 
 router = Router()
 

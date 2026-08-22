@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from core import bot_settings
+from x_ui.core import bot_settings
 
 MESSAGES: Dict[str, Dict[str, str]] = {
     "en": {

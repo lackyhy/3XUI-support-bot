@@ -8,15 +8,15 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
-from core.api_client import ThreeXUIClient, format_bytes, ensure_dict, extract_external_sub
-from core import crypto_storage
-from keyboards import inline as keyboards
-from states.states import AddClientStates, SearchClientStates, EditClientGBStates, EditClientExpiryStates, SetSubPortStates
+from x_ui.core.api_client import ThreeXUIClient, format_bytes, ensure_dict, extract_external_sub
+from x_ui.core import crypto_storage
+from x_ui.keyboards import inline as keyboards
+from x_ui.states.states import AddClientStates, SearchClientStates, EditClientGBStates, EditClientExpiryStates, SetSubPortStates
 
 router = Router()
 
-from core import bot_settings
-from core.i18n import t
+from x_ui.core import bot_settings
+from x_ui.core.i18n import t
 
 def format_timestamp(ms: int, lang: str = "en") -> str:
     if not ms or ms <= 0:

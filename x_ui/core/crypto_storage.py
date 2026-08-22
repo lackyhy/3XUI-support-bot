@@ -40,6 +40,16 @@ def load_raw_storage() -> Dict[str, Any]:
             save_raw_storage(migrated)
             return migrated
 
+        # Ensure all panels have panel_type
+        if "panels" in data and isinstance(data["panels"], dict):
+            updated = False
+            for pid, pobj in data["panels"].items():
+                if "panel_type" not in pobj:
+                    pobj["panel_type"] = "x_ui"
+                    updated = True
+            if updated:
+                save_raw_storage(data)
+
         return data
     except Exception as e:
         print(f"Error decrypting credentials: {e}")
@@ -85,7 +95,8 @@ def add_or_update_panel(
     token: Optional[str] = None,
     username: Optional[str] = None,
     password: Optional[str] = None,
-    panel_id: Optional[str] = None
+    panel_id: Optional[str] = None,
+    panel_type: str = "x_ui"
 ) -> str:
     storage = load_raw_storage()
     if not panel_id:
@@ -98,7 +109,8 @@ def add_or_update_panel(
         "auth_type": auth_type,
         "token": token,
         "username": username,
-        "password": password
+        "password": password,
+        "panel_type": panel_type
     }
 
     if "panels" not in storage:
@@ -172,7 +184,7 @@ def derive_default_panel_name(host_url: str) -> str:
             pass
         return raw_host
     except Exception:
-        return "Сервер 3x-ui"
+        return "Сервер"
 
 def has_credentials() -> bool:
     return get_active_panel() is not None

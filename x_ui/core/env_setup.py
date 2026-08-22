@@ -9,7 +9,7 @@ def ensure_env_file() -> None:
     Checks if .env file exists with all required configuration variables.
     If missing or incomplete, interactively prompts user in terminal to provide them.
     """
-    env_file = Path(__file__).resolve().parent.parent / ".env"
+    env_file = Path(__file__).resolve().parent.parent.parent / ".env"
     
     bot_token = ""
     admin_id = ""
